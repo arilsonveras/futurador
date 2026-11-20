@@ -227,10 +227,10 @@ export async function POST(req:Request){
     parts=[{text:'PÁGINA OFICIAL E LISTA DE DOCUMENTOS:\n'+pageText+'\n\nLINKS DOS ARQUIVOS:\n'+anchors.map(a=>a.label+' — '+a.href).filter(x=>x.trim()).slice(0,100).join('\n')}];
    }
   }
-  if(!aiEnabled){
-   const local=localEditalExtraction(localPages.length?localPages:[htmlText(new TextDecoder().decode(buffer))],evidenceUrl,sourceType);
-   return NextResponse.json(local);
-  }
+  const localResult=localEditalExtraction(localPages.length?localPages:[htmlText(new TextDecoder().decode(buffer))],evidenceUrl,sourceType);
+  // A extração determinística é sempre a primeira etapa. A IA só entra como apoio
+  // quando o parser local não conseguiu reconhecer cargos ou disciplinas.
+  if(!aiEnabled||(localResult.positions.length>0&&localResult.subjects.length>0))return NextResponse.json(localResult);
   parts.push({text:`Você é especialista em leitura de editais de concursos públicos brasileiros. Faça uma extração minuciosa, priorizando o edital mais recente e suas retificações. Não use conhecimento externo nem invente dados.
 Responda exclusivamente JSON válido neste formato:
 {"documentType":"edital_abertura"|"retificacao"|"demanda"|"resultado"|"outro"|"incerto","isOfficialNotice":boolean,"examName":string|null,"institution":string|null,"organizer":string|null,"examDate":"YYYY-MM-DD"|null,"positions":[{"name":string,"category":string|null,"formation":string|null,"educationLevel":string|null,"vacancies":number|null,"immediateVacancies":number|null,"reserveList":boolean|null,"vacancyBreakdown":{"general":number|null,"disability":number|null,"black":number|null,"indigenous":number|null,"quilombola":number|null},"evidence":string}],"subjects":[{"name":string,"positionNames":string[],"scope":"common"|"specific","module":"basic"|"specific","topics":[string],"evidence":string}],"officialSource":boolean,"warnings":string[]}.
@@ -288,13 +288,12 @@ Documento efetivamente analisado: ${evidenceUrl}`});
    if(response?.status===429||response?.status===400||response?.status===401||response?.status===403)break;
   }
   if(!response||!response.ok){
-   const local=localEditalExtraction(localPages.length?localPages:[htmlText(new TextDecoder().decode(buffer))],evidenceUrl,sourceType);
-   local.warnings.unshift('O serviço de IA não respondeu. O Futurador concluiu uma tentativa de extração local; confira os resultados antes de continuar.');
-   return NextResponse.json(local);
+   localResult.warnings.unshift('O serviço de IA não respondeu. O Futurador concluiu a análise com a extração local; confira os resultados antes de continuar.');
+   return NextResponse.json(localResult);
   }
   if(!response.ok){
-   if(response.status===429){const local=localEditalExtraction(localPages,evidenceUrl,sourceType);local.warnings.unshift('A cota gratuita de IA está indisponível. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(local);}
-   if(response.status===503){const local=localEditalExtraction(localPages,evidenceUrl,sourceType);local.warnings.unshift('O Google está temporariamente sem capacidade. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(local);}
+   if(response.status===429){localResult.warnings.unshift('A cota gratuita de IA está indisponível. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(localResult);}
+   if(response.status===503){localResult.warnings.unshift('O Google está temporariamente sem capacidade. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(localResult);}
    if(response.status>=500)return NextResponse.json({error:'O serviço de IA apresentou uma falha temporária (HTTP '+response.status+'). Tente novamente em alguns minutos.'},{status:503});
    return NextResponse.json({error:'O serviço de IA recusou a solicitação (HTTP '+response.status+'). Verifique a configuração da chave no painel do projeto.'},{status:502});
   }
