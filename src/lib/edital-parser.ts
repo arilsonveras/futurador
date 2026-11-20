@@ -71,7 +71,9 @@ function extractFgvPositions(text: string): ParsedPosition[] {
 function extractNamedSubjects(block: string, definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }>, scope: 'common' | 'specific', groupPositionNames: string[] = []) {
   const matches: Array<{ start: number; end: number; definition: typeof definitions[number] }> = [];
   for (const definition of definitions) {
-    const pattern = new RegExp('(?:^\\s*|[.!?]\\s+)(' + escapeRegex(definition.label) + ')\\s*\\.', 'gi');
+    // Match only headings at the start of a PDF text line. Matching after any
+    // sentence-ending dot also captured words mentioned inside another subject.
+    const pattern = new RegExp('(?:^|\\n)[\\t ]*(' + escapeRegex(definition.label) + ')\\s*\\.', 'gim');
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(block)) !== null) {
       const offset = match.index + match[0].lastIndexOf(match[1]);
@@ -93,9 +95,12 @@ function extractNamedSubjects(block: string, definitions: Array<{ label: string;
 function parseFgvSeduc(text: string): ParsedEdital | null {
   const normalized = normalize(text).replace(/\[\[PAGE:\d+\]\]/g, ' ');
   if (!normalized.includes('ANEXO V - CONTEUDO PROGRAMATICO') || !normalized.includes('ANEXO II - QUADRO DE VAGAS')) return null;
-  const positions = extractFgvPositions(text);
-  if (!positions.length) return null;
-  const contentStart = normalized.indexOf('4. DO CONTEUDO PROGRAMATICO');
+  const positions = extractFgvPosition  // Keep PDF line breaks so discipline titles remain distinguishable from topic text.
+  const flat = text.replace(/\[\[PAGE:\d+\]\]/g, '\n').replace(/[\t ]+/g, ' ').replace(/\n{3,}/g, '\n\n');
+  const contentStartInFlat = flat.search(/4\.\s*DO\s+CONTE[ÚU]DO\s+PROGRAM[ÁA]TICO/i);
+  if (contentStartInFlat < 0) return null;
+  const content = flat.slice(contentStartInFlat);
+
   if (contentStart < 0) return null;
   const flat = text.replace(/\[\[PAGE:\d+\]\]/g, ' ').replace(/\s+/g, ' ');
   const content = flat.slice(contentStart);
@@ -126,7 +131,8 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
       : number === 3 ? positions.filter(position => position.name.startsWith('Analista de Gestão Governamental'))
       : positions.filter(position => position.name.startsWith('Assistente de Gestão'));
     if (!sectionPositions.length) continue;
-    const normalizedSection = normalize(sectionText);
+    // Preserve whitespace positions while removing accents for section detection.
+    const normalizedSection = sectionText.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase();
     const basicIndex = normalizedSection.indexOf('CONHECIMENTOS BASICOS');
     const specificIndex = normalizedSection.indexOf('CONHECIMENTOS ESPECIFICOS');
     if (basicIndex >= 0 && specificIndex > basicIndex) {
