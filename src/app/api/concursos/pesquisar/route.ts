@@ -53,7 +53,7 @@ const OFFICIAL_EXAM_BOARD_DOMAINS = [
 
 function isOfficialExamBoardUrl(rawUrl: string) {
   try {
-    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '');
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '');
     return OFFICIAL_EXAM_BOARD_DOMAINS.some((domain) => host === domain || host.endsWith('.' + domain));
   } catch {
     return false;
@@ -77,27 +77,27 @@ function isTrustedOfficialUrl(rawUrl: string) {
 }
 
 function queryAliases(query: string) {
-  const normalized = query.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase();
+  const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const aliases: string[] = [];
-  if (/\\bPMSP\\b|\\bPMESP\\b/.test(normalized)) {
+  if (/\bPMSP\b|\bPMESP\b/.test(normalized)) {
     aliases.push('Polícia Militar do Estado de São Paulo', 'PMESP', 'concursos.policiamilitar.sp.gov.br');
   }
-  if (/\\bPMSC\\b/.test(normalized)) {
+  if (/\bPMSC\b/.test(normalized)) {
     aliases.push('Polícia Militar de Santa Catarina', 'PM Santa Catarina', 'pm.sc.gov.br', 'Instituto AOCP');
   }
-  if (/\\bPMERJ\\b/.test(normalized)) {
+  if (/\bPMERJ\b/.test(normalized)) {
     aliases.push('Polícia Militar do Estado do Rio de Janeiro', 'PMERJ');
   }
-  if (/\\bPMMG\\b/.test(normalized)) {
+  if (/\bPMMG\b/.test(normalized)) {
     aliases.push('Polícia Militar de Minas Gerais', 'PMMG');
   }
-  if (/\\bPMPR\\b/.test(normalized)) {
+  if (/\bPMPR\b/.test(normalized)) {
     aliases.push('Polícia Militar do Paraná', 'PMPR');
   }
-  if (/\\bPCSP\\b/.test(normalized)) {
+  if (/\bPCSP\b/.test(normalized)) {
     aliases.push('Polícia Civil do Estado de São Paulo');
   }
-  if (/\\bPCSC\\b/.test(normalized)) {
+  if (/\bPCSC\b/.test(normalized)) {
     aliases.push('Polícia Civil de Santa Catarina');
   }
   return aliases;
