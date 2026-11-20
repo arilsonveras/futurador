@@ -111,14 +111,14 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   let usedModel='gemini-3.5-flash-lite';
   let providerMessage='';
   // Mantém o modelo gratuito mais econômico como principal. Se o Google devolver 5xx,
-  // tenta uma vez o Gemini 3.8 Flash, que também possui faixa gratuita documentada.
+  // tenta outros modelos Gemini com faixa gratuita documentada, sem habilitar billing.
   // Não habilita billing nem muda a configuração de cobrança do projeto.
-  const modelFallbacks=[{name:'gemini-3.5-flash-lite',attempts:2},{name:'gemini-3.8-flash',attempts:1}];
+  const modelFallbacks=[{name:'gemini-3.5-flash-lite',attempts:2},{name:'gemini-3.8-flash',attempts:1},{name:'gemini-3.6-flash',attempts:1},{name:'gemini-3.1-flash-lite',attempts:1}];
   for(let modelIndex=0;modelIndex<modelFallbacks.length;modelIndex++){
    const model=modelFallbacks[modelIndex];
    for(let attempt=0;attempt<model.attempts;attempt++){
     const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
-    response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(90000)});
+    response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(55000)});
     if(response.ok){usedModel=model.name;break;}
     const details=await response.clone().json().catch(()=>null);
     providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
@@ -136,7 +136,7 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
    if(response.status===429)return NextResponse.json({error:'O limite gratuito de uso da IA foi atingido ou a cota do projeto está indisponível. Confira o painel de uso do Google AI Studio. Nenhuma cobrança será ativada.'},{status:429});
-   if(response.status===503)return NextResponse.json({error:'O Google está temporariamente sem capacidade para atender a análise, inclusive após a tentativa em um segundo modelo gratuito. Aguarde alguns minutos e tente novamente. Nenhuma cobrança foi ativada.'},{status:503});
+   if(response.status===503)return NextResponse.json({error:'O Google está temporariamente sem capacidade para atender a análise, mesmo após tentar outros modelos disponíveis na faixa gratuita. Aguarde alguns minutos e tente novamente. Nenhuma cobrança foi ativada.'},{status:503});
    if(response.status>=500)return NextResponse.json({error:'O serviço de IA apresentou uma falha temporária (HTTP '+response.status+'). Tente novamente em alguns minutos.'},{status:503});
    return NextResponse.json({error:'O serviço de IA recusou a solicitação (HTTP '+response.status+'). Verifique a configuração da chave no painel do projeto.'},{status:502});
   }
