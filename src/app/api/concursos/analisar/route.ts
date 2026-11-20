@@ -109,11 +109,15 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   const endpoint='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
   const requestBody=JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.05,maxOutputTokens:16000,responseMimeType:'application/json'}});
   let response:Response|null=null;
-  // Erros 5xx do provedor podem ser transitórios. Faz apenas uma nova tentativa, sem ativar cobrança ou trocar de modelo.
-  for(let attempt=0;attempt<2;attempt++){
+  // Erros 5xx do provedor podem ser transitórios. Usa espera progressiva e respeita Retry-After,
+  // sem trocar de modelo, habilitar cobrança ou repetir erros de limite/autenticação.
+  for(let attempt=0;attempt<3;attempt++){
    response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(110000)});
-   if(response.ok||![500,502,503,504].includes(response.status)||attempt===1)break;
-   await new Promise(resolve=>setTimeout(resolve,1800));
+   if(response.ok||![500,502,503,504].includes(response.status)||attempt===2)break;
+   const retryAfter=response.headers.get('retry-after');
+   const retryAfterMs=retryAfter&&Number.isFinite(Number(retryAfter))?Math.min(8000,Math.max(0,Number(retryAfter)*1000)):0;
+   const backoffMs=[2500,6000][attempt];
+   await new Promise(resolve=>setTimeout(resolve,Math.max(backoffMs,retryAfterMs)));
   }
   if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
