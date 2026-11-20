@@ -34,10 +34,10 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
  for(let pageNumber=1;pageNumber<=document.numPages;pageNumber++){
   const page=await document.getPage(pageNumber);
   const content=await page.getTextContent();
-  const text=content.items.map((item:any)=>typeof item.str==='string'?item.str:'').filter(Boolean).join(' ').replace(/\\s+/g,' ').trim();
+  const text=content.items.map((item:any)=>typeof item.str==='string'?item.str:'').filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
   pages.push(text);
  }
- const normalized=pages.map(value=>value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase());
+ const normalized=pages.map(value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase());
  const selected=new Set<number>();
  for(let i=0;i<Math.min(12,pages.length);i++)selected.add(i);
  for(let i=0;i<normalized.length;i++){
@@ -57,10 +57,11 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
  }
  let selectedPages=[...selected].sort((a,b)=>a-b);
  if(selectedPages.length>90)selectedPages=selectedPages.slice(0,90);
- const text=selectedPages.map(index=>'[PÁGINA '+(index+1)+' de '+pages.length+']\\n'+pages[index].slice(0,9000)).join('\\n\\n');
+ const text=selectedPages.map(index=>'[PÁGINA '+(index+1)+' de '+pages.length+']\n'+pages[index].slice(0,9000)).join('\n\n');
  return {pageCount:pages.length,selectedCount:selectedPages.length,text};
 }
-\nasync function getSource(url:URL){
+
+async function getSource(url:URL){
  const response=await fetch(url.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(15000),cache:'no-store'});
  if(response.status>=300&&response.status<400){
   const location=response.headers.get('location');
@@ -96,7 +97,7 @@ export async function POST(req:Request){
    try{
     const extracted=await extractRelevantPdfText(buffer);
     if(extracted.text.length>=2500){
-     parts=[{text:'TEXTO EXTRAÍDO DO EDITAL EM PDF. O documento possui '+extracted.pageCount+' páginas; foram selecionadas '+extracted.selectedCount+' páginas iniciais e relevantes para cargos, vagas, cronograma e conteúdo programático. Preserve os números de página entre colchetes nas evidências.\\n\\n'+extracted.text}];
+     parts=[{text:'TEXTO EXTRAÍDO DO EDITAL EM PDF. O documento possui '+extracted.pageCount+' páginas; foram selecionadas '+extracted.selectedCount+' páginas iniciais e relevantes para cargos, vagas, cronograma e conteúdo programático. Preserve os números de página entre colchetes nas evidências.\n\n'+extracted.text}];
     }else{
      parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
     }
