@@ -65,13 +65,13 @@ export async function POST(req:Request){
    const anchors=[...html.matchAll(/<a\b([^>]*)href\s*=\s*["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi)].map(m=>({
     href:m[2],label:htmlText(m[4]),attrs:(m[1]+' '+m[3]).toLowerCase()
    }));
-   const editalLink=anchors.map(a=>({...a,url:safeUrl(new URL(a.href,sourceUrl).toString()),descriptor:(a.label+' '+a.attrs+' '+a.href).toLowerCase(),labelNorm:a.label.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim()}))
+   const editalLink=anchors.map(a=>({...a,url:safeUrl(new URL(a.href,sourceUrl).toString()),descriptor:(a.label+' '+a.attrs+' '+a.href).toLowerCase(),labelNorm:a.label.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}))
     // Nunca selecionar demanda, concorrência, listas, resultados ou retificações isoladas quando a página oferece o edital consolidado.
-    .filter(a=>a.url&&!/demanda|candidat[oa]s?\\s*(por|\\/|-)\\s*vaga|concorr[eê]ncia|inscri[cç][oõ]es|resultado|classifica[cç][aã]o|gabarito|convoca[cç][aã]o/.test(a.descriptor))
+    .filter(a=>a.url&&!/demanda|candidat[oa]s?\s*(por|\/|-)\s*vaga|concorr[eê]ncia|inscri[cç][oõ]es|resultado|classifica[cç][aã]o|gabarito|convoca[cç][aã]o/.test(a.descriptor))
     .filter(a=>/edital|retifica|vers[aã]o acess[ií]vel/.test(a.descriptor))
     // "Edital (retificado em...)" é o edital completo consolidado; "1ª/2ª Retificação" é apenas um aditivo.
     .sort((a,b)=>{
-      const score=(x:any)=>/^edital\\b/.test(x.labelNorm)&&!/^\\d/.test(x.labelNorm)?100:
+      const score=(x:any)=>/^edital\b/.test(x.labelNorm)&&! /^\d/.test(x.labelNorm)?100:
         /edital.*(retificado|consolidado)|versao acessivel/.test(x.labelNorm)?90:
         /retificacao/.test(x.labelNorm)?10:0;
       return score(b)-score(a);
