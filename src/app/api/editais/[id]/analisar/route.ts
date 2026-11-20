@@ -82,30 +82,43 @@ Use null quando a informação não estiver expressa. module deve ser "basic" ou
 PÁGINAS DO EDITAL (marcadores [[PAGE:n]]):
 ${text}`;
 
-  let geminiResponse: Response;
-  try {
-    geminiResponse = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: 'Responda somente JSON válido, seguindo exatamente o esquema solicitado.' }],
-          },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 14000,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: AbortSignal.timeout(55_000),
+  let geminiResponse: Response | null = null;
+  // O Google recomenda retry com backoff para HTTP 503 (sobrecarga temporária).
+  // Duas tentativas limitam a espera e mantêm a função dentro do limite de 60s da Vercel.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      geminiResponse = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: 'Responda somente JSON válido, seguindo exatamente o esquema solicitado.' }],
+            },
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 14000,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: AbortSignal.timeout(25_000),
+        }
+      );
+    } catch {
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        continue;
       }
-    );
-  } catch {
-    return fail('Não foi possível conectar ao Gemini. Tente novamente mais tarde.', 502);
+      return fail('Não foi possível conectar ao Gemini após uma nova tentativa. Tente novamente mais tarde.', 502);
+    }
+
+    if (geminiResponse.status !== 503 || attempt === 1) break;
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
+
+  if (!geminiResponse) return fail('Não foi possível conectar ao Gemini. Tente novamente mais tarde.', 502);
 
   if (!geminiResponse.ok) {
     const status = geminiResponse.status;
