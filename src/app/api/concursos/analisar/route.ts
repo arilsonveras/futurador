@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 export const runtime='nodejs';
-export const maxDuration=60;
+export const maxDuration=300;
 
 function jsonFrom(value:string){
  const clean=value.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
@@ -111,7 +111,7 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   let response:Response|null=null;
   // Erros 5xx do provedor podem ser transitórios. Faz apenas uma nova tentativa, sem ativar cobrança ou trocar de modelo.
   for(let attempt=0;attempt<2;attempt++){
-   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(25000)});
+   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(110000)});
    if(response.ok||![500,502,503,504].includes(response.status)||attempt===1)break;
    await new Promise(resolve=>setTimeout(resolve,1800));
   }
@@ -147,5 +147,11 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   if(sourceType!=='pdf')warnings.unshift('A fonte analisada foi uma página HTML; o edital em PDF não foi localizado automaticamente. Confira o conteúdo antes de gerar o cronograma.');
   if(!subjects.length||subjects.every((s:any)=>!s.topics.length))warnings.push('Nenhum tópico programático foi extraído. O Futurador deve impedir a geração de um cronograma baseado em conteúdo vazio.');
   return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,documentType,isOfficialNotice,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
- }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Não foi possível analisar a fonte.'},{status:502});}
+ }catch(e){
+  const message=e instanceof Error?e.message:'';
+  if(e instanceof Error&&(e.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
+   return NextResponse.json({error:'A análise do edital demorou mais que o esperado. Isso pode acontecer com PDFs muito extensos. Tente novamente; nenhuma cobrança foi ativada.'},{status:504});
+  }
+  return NextResponse.json({error:message||'Não foi possível analisar a fonte.'},{status:502});
+ }
 }
