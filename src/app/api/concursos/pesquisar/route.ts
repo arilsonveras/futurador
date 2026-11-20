@@ -156,7 +156,7 @@ export async function POST(req: Request) {
       results = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
     }
 
-    const queryWords = normalized.split(/\s+/).filter(word => word.length > 1 && !/^20\d{2}$/.test(word));
+    const queryWords: string[] = normalized.split(/\s+/).filter((word: string) => word.length > 1 && !/^20\d{2}$/.test(word));
     results.sort((a, b) => rank(b, queryWords) - rank(a, queryWords));
 
     return NextResponse.json({
