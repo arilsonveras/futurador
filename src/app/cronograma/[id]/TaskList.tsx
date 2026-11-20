@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import FullScreenLoader from '@/components/FullScreenLoader';
 
 type Task = {
   id: string;
