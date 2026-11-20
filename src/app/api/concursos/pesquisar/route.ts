@@ -26,11 +26,44 @@ function target(raw: string) {
   } catch { return null; }
 }
 
+const OFFICIAL_EXAM_BOARD_DOMAINS = [
+  'conhecimento.fgv.br',
+  'fgv.br',
+  'cebraspe.org.br',
+  'concursosfcc.com.br',
+  'vunesp.com.br',
+  'ibfc.org.br',
+  'institutoaocp.org.br',
+  'consulplan.net',
+  'idecan.org.br',
+  'iades.com.br',
+  'quadrix.org.br',
+  'fundatec.org.br',
+  'fepese.org.br',
+  'legalleconcursos.com.br',
+  'objetivas.com.br',
+  'msconcursos.com.br',
+  'selecon.org.br',
+  'institutoverbena.ufg.br',
+  'avalia.org.br',
+  'access.org.br',
+  'institutoconsulplan.org.br',
+  'institutoconsulplan.org',
+];
+
+function isOfficialExamBoardUrl(rawUrl: string) {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '');
+    return OFFICIAL_EXAM_BOARD_DOMAINS.some((domain) => host === domain || host.endsWith('.' + domain));
+  } catch {
+    return false;
+  }
+}
+
 function rank(item: Result, terms: string[]) {
   const value = (item.url + ' ' + item.title + ' ' + item.snippet).toLowerCase();
-  let score = 0;
+  let score = 100;
   if (value.includes('conhecimento.fgv.br/concursos')) score += 150;
-  if (value.includes('gov.br') || value.includes('.pa.gov.br')) score += 55;
   if (/edital|concurso|processo seletivo/.test(value)) score += 20;
   if (/resultado|gabarito|classifica[cç][aã]o|demanda por vaga/.test(value)) score -= 10;
   for (const term of terms) {
@@ -117,40 +150,20 @@ export async function POST(req: Request) {
       if (!previous || item.snippet.length > previous.snippet.length) unique.set(item.url, item);
     }
 
-    // A página oficial da FGV deve aparecer mesmo que o buscador não interprete a sigla "PA".
+    // Exibe exclusivamente páginas da banca organizadora oficial.
+    // Para SEDUC-PA, a página da FGV é a fonte oficial confirmada.
     if (isSeducPa) {
-      const knownSources: Result[] = [
-        {
-          title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (página oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (página oficial)',
-          url: 'https://conhecimento.fgv.br/concursos/seducpa26',
-          snippet: 'Página oficial da FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais da edição 2026.',
-          source: 'conhecimento.fgv.br',
-        },
-        {
-          title: 'SEDUC-PA 2026 — Edital nº 1 | Qconcursos',
-          url: 'https://www.qconcursos.com/questoes-de-concursos/concursos/seduc-pa-2026-edital-n-1',
-          snippet: 'Página especializada com informações do concurso SEDUC-PA 2026, banca FGV, cargos, vagas e data da prova.',
-          source: 'qconcursos.com',
-        },
-        {
-          title: 'Concurso SEDUC-PA 2026: edital e informações | Aprova Concursos',
-          url: 'https://www.aprovaconcursos.com.br/noticias/concurso-seduc-pa/',
-          snippet: 'Notícia especializada sobre o concurso da Secretaria de Educação do Pará, com referência ao edital e às 2.000 vagas.',
-          source: 'aprovaconcursos.com.br',
-        },
-        {
-          title: 'Governo do Pará publica edital de concurso da Seduc 2026 | Agência Pará',
-          url: 'https://www.agenciapara.com.br/noticia/79372/governo-do-para-publica-nesta-segunda-feira-31-edital-de-concurso-da-seduc-com-2-mil-vagas-abertas',
-          snippet: 'Notícia do Governo do Pará sobre a publicação do edital da SEDUC, com informações sobre vagas e etapas.',
-          source: 'agenciapara.com.br',
-        },
-      ];
-      for (const item of knownSources) {
-        if (!year || (item.title + ' ' + item.url + ' ' + item.snippet).includes(year)) unique.set(item.url, item);
-      }
+      const officialFgv: Result = {
+        title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (banca oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (banca oficial)',
+        url: 'https://conhecimento.fgv.br/concursos/seducpa26',
+        snippet: 'Página oficial da banca FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais.',
+        source: 'conhecimento.fgv.br',
+      };
+      unique.set(officialFgv.url, officialFgv);
     }
 
-    let results = [...unique.values()];
+    let results = [...unique.values()].filter((item) => isOfficialExamBoardUrl(item.url));
+
     // O ano só restringe quando foi digitado explicitamente pelo candidato.
     if (year) {
       results = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
