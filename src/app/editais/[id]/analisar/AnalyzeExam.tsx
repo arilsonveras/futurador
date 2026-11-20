@@ -186,6 +186,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
 
   return (
     <main className="wrap">
+      {(extracting || busy) && <FullScreenLoader mode="analyze" />}
       <nav className="nav"><Link className="brand" href="/">futurador.</Link><Link href="/painel">Voltar ao painel</Link></nav>
       <section className="panel">
         <h1>Análise inteligente do edital</h1>
