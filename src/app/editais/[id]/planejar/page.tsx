@@ -34,7 +34,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
   const { data: availability } = await supabase.from('study_availability')
     .select('weekday,start_time,end_time').order('weekday');
   const { data: plans } = await supabase.from('study_plans')
-    .select('id').eq('exam_id', id).eq('status', 'active').order('created_at', { ascending: false }).limit(1);
+    .select('id,position_id').eq('exam_id', id).eq('status', 'active').order('created_at', { ascending: false }).limit(1);
 
   return (
     <PlannerSetup
@@ -44,7 +44,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
       topics={topics}
       positions={positions || []}
       initialAvailability={availability || []}
-      existingPlanId={plans?.[0]?.id || null}
+      existingPlanId={plans?.find(plan => plan.position_id === (positions?.[0]?.id || null))?.id || null}
     />
   );
 }
