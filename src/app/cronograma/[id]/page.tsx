@@ -15,7 +15,7 @@ export default async function CronogramaPage({ params }: { params: Promise<{ id:
   if (error || !plan) notFound();
 
   const { data: tasks } = await supabase.from('study_tasks')
-    .select('id,title,scheduled_for,starts_at,duration_minutes,status,notes')
+    .select('id,topic_id,title,scheduled_for,starts_at,duration_minutes,status,notes')
     .eq('plan_id', id)
     .order('scheduled_for', { ascending: true })
     .order('starts_at', { ascending: true });
