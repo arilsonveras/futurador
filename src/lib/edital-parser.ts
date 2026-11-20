@@ -93,18 +93,22 @@ function extractNamedSubjects(block: string, definitions: Array<{ label: string;
 }
 
 function parseFgvSeduc(text: string): ParsedEdital | null {
-  const normalized = normalize(text).replace(/\[\[PAGE:\d+\]\]/g, ' ');
+  const normalized = normalize(text).replace(/\\[\\[PAGE:\\d+\\]\\]/g, ' ');
   if (!normalized.includes('ANEXO V - CONTEUDO PROGRAMATICO') || !normalized.includes('ANEXO II - QUADRO DE VAGAS')) return null;
-  const positions = extractFgvPosition  // Keep PDF line breaks so discipline titles remain distinguishable from topic text.
-  const flat = text.replace(/\[\[PAGE:\d+\]\]/g, '\n').replace(/[\t ]+/g, ' ').replace(/\n{3,}/g, '\n\n');
-  const contentStartInFlat = flat.search(/4\.\s*DO\s+CONTE[ÚU]DO\s+PROGRAM[ÁA]TICO/i);
-  if (contentStartInFlat < 0) return null;
-  const content = flat.slice(contentStartInFlat);
 
+  const positions = extractFgvPositions(text);
+  if (!positions.length) return null;
+
+  // Preserve line breaks from PDF.js: discipline titles are standalone lines.
+  const flat = text
+    .replace(/\\[\\[PAGE:\\d+\\]\\]/g, '\\n')
+    .replace(/[\\t ]+/g, ' ')
+    .replace(/\\n{3,}/g, '\\n\\n');
+  const contentStart = flat.search(/4\\.\\s*DO\\s+CONTE[ÚU]DO\\s+PROGRAM[ÁA]TICO/i);
   if (contentStart < 0) return null;
-  const flat = text.replace(/\[\[PAGE:\d+\]\]/g, ' ').replace(/\s+/g, ' ');
   const content = flat.slice(contentStart);
-  const sections = Array.from(content.matchAll(/4\.\s*(\d+)\.\s*([^]*?)(?=4\.\s*\d+\.\s|$)/g));
+
+  const sectionMatches = Array.from(content.matchAll(/(?:^|\\n)[\\t ]*4\\.[\\t ]*(\\d+)\\.[^\\n]*/g));
   const subjects: ParsedSubject[] = [];
   const commonBase = [
     { label: 'Língua Portuguesa', module: 'basic' as const, questions: 10 },
@@ -122,16 +126,20 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
     ['Educação Especial', 'Professor Classe I — Educação Especial - AEE'], ['Língua Portuguesa Libras', 'Professor Classe I — Educação Especial - LIBRAS'], ['Especialista em Educação', 'Especialista em Educação'],
   ] as const;
 
-  for (const section of sections) {
+  for (let sectionIndex = 0; sectionIndex < sectionMatches.length; sectionIndex++) {
+    const section = sectionMatches[sectionIndex];
     const number = Number(section[1]);
-    const sectionText = section[2];
+    const sectionStart = section.index! + section[0].length;
+    const sectionEnd = sectionMatches[sectionIndex + 1]?.index ?? content.length;
+    const sectionText = content.slice(sectionStart, sectionEnd);
     const sectionPositions = number === 1
       ? positions.filter(position => position.name.startsWith('Professor Classe I') || position.name === 'Especialista em Educação')
       : number === 2 ? positions.filter(position => position.name.startsWith('Analista de Suporte Educacional'))
       : number === 3 ? positions.filter(position => position.name.startsWith('Analista de Gestão Governamental'))
       : positions.filter(position => position.name.startsWith('Assistente de Gestão'));
     if (!sectionPositions.length) continue;
-    // Preserve whitespace positions while removing accents for section detection.
+
+    // Remove accents without collapsing whitespace so offsets remain valid.
     const normalizedSection = sectionText.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase();
     const basicIndex = normalizedSection.indexOf('CONHECIMENTOS BASICOS');
     const specificIndex = normalizedSection.indexOf('CONHECIMENTOS ESPECIFICOS');
@@ -142,6 +150,7 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
         : commonBase.filter(item => item.label !== 'Conhecimentos Pedagógicos');
       subjects.push(...extractNamedSubjects(basicBlock, definitions, 'common', sectionPositions.map(position => position.name)));
     }
+
     if (specificIndex >= 0) {
       const specificBlock = sectionText.slice(specificIndex + 'CONHECIMENTOS ESPECÍFICOS'.length);
       let definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }> = [];
@@ -152,18 +161,19 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
         { label: 'Assistente Social', positionName: 'Analista de Suporte Educacional — Serviço Social', module: 'specific', questions: 30 },
       ];
       else if (number === 3) definitions = [
+        { label: 'Arquiteto', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Arquitetura e Urbanismo', module: 'specific', questions: 30 },
+        { label: 'Engenheiro Civil', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Civil', module: 'specific', questions: 30 },
+        { label: 'Engenheiro Elétrico', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Elétrica', module: 'specific', questions: 30 },
         { label: 'Administrador', positionName: 'Analista de Gestão Governamental e Política Educacional — Administração', module: 'specific', questions: 30 },
         { label: 'Contador', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Contábeis', module: 'specific', questions: 30 },
         { label: 'Economista', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Econômicas', module: 'specific', questions: 30 },
         { label: 'Estatística', positionName: 'Analista de Gestão Governamental e Política Educacional — Estatística', module: 'specific', questions: 30 },
-        { label: 'Arquiteto', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Arquitetura e Urbanismo', module: 'specific', questions: 30 },
-        { label: 'Engenheiro Civil', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Civil', module: 'specific', questions: 30 },
-        { label: 'Engenheiro Elétrico', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Elétrica', module: 'specific', questions: 30 },
       ];
       else definitions = [{ label: 'Assistente de Gestão Administrativa', positionName: 'Assistente de Gestão Governamental e Educacional', module: 'specific', questions: 30 }];
       subjects.push(...extractNamedSubjects(specificBlock, definitions, 'specific'));
     }
   }
+
   const warnings: string[] = [];
   if (!subjects.length) warnings.push('Os cargos foram encontrados no Anexo II, mas não foi possível relacionar com segurança os conteúdos do Anexo V. Confira a análise manualmente.');
   warnings.push('Os cargos e formações foram identificados no Anexo II; as disciplinas foram relacionadas às seções correspondentes do Anexo V. Confira a lista antes de salvar.');
