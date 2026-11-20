@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.js';
 import type { ParsedEdital } from '@/lib/edital-parser';
+import FullScreenLoader from '@/components/FullScreenLoader';
 
 GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
