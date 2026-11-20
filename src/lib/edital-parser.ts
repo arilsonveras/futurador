@@ -60,7 +60,7 @@ function isSubjectHeading(line: string) {
 
 function isCommonSection(line: string) {
   const value = normalize(line);
-  return /CONHECIMENTOS (BASICOS|GERAIS).*PARA TODOS|CONHECIMENTOS BASICOS PARA CARGOS|CONHECIMENTOS GERAIS PARA TODOS OS CARGOS/.test(value);
+  return /^(?:[IVX]+\\.\\s*)?CONHECIMENTOS (BASICOS|GERAIS).*PARA TODOS|^(?:[IVX]+\\.\\s*)?CONHECIMENTOS BASICOS PARA CARGOS|CONHECIMENTOS GERAIS PARA TODOS OS CARGOS/.test(value);
 }
 
 export function parseEditalText(rawText: string): ParsedEdital {
