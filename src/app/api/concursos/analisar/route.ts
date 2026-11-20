@@ -97,14 +97,21 @@ REGRAS OBRIGATÓRIAS:
 7) Não confunda "Professor" (grupo) com cada formação específica.
 URL inicial: ${initialUrl.toString()}
 Documento efetivamente analisado: ${evidenceUrl}`});
-  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',{
-   method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
-   body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.05,maxOutputTokens:16000,responseMimeType:'application/json'}}),
-   signal:AbortSignal.timeout(45000)
-  });
+  const endpoint='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
+  const requestBody=JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.05,maxOutputTokens:16000,responseMimeType:'application/json'}});
+  let response:Response|null=null;
+  // Erros 5xx do provedor podem ser transitórios. Faz apenas uma nova tentativa, sem ativar cobrança ou trocar de modelo.
+  for(let attempt=0;attempt<2;attempt++){
+   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(25000)});
+   if(response.ok||![500,502,503,504].includes(response.status)||attempt===1)break;
+   await new Promise(resolve=>setTimeout(resolve,1800));
+  }
+  if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
-   if(response.status===429)return NextResponse.json({error:'A cota gratuita da IA está temporariamente indisponível. Tente mais tarde; nenhuma cobrança será ativada automaticamente.'},{status:429});
-   return NextResponse.json({error:'A IA não conseguiu analisar a fonte (código '+response.status+').'},{status:502});
+   if(response.status===429)return NextResponse.json({error:'O limite gratuito de uso da IA foi atingido. Aguarde a renovação da cota e tente novamente. Nenhuma cobrança será ativada.'},{status:429});
+   if(response.status===503)return NextResponse.json({error:'O serviço Gemini está temporariamente indisponível ou sobrecarregado. O Futurador tentou novamente automaticamente, mas o provedor não respondeu. Aguarde alguns minutos e tente outra vez; nenhuma cobrança foi ativada.'},{status:503});
+   if(response.status>=500)return NextResponse.json({error:'O serviço de IA apresentou uma falha temporária (HTTP '+response.status+'). Tente novamente em alguns minutos.'},{status:503});
+   return NextResponse.json({error:'O serviço de IA recusou a solicitação (HTTP '+response.status+'). Verifique a configuração da chave no painel do projeto.'},{status:502});
   }
   const payload=await response.json();
   const output=payload?.candidates?.[0]?.content?.parts?.map((p:any)=>p.text||'').join('')||'';
