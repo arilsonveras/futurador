@@ -1,0 +1,1 @@
+declare module 'pdfjs-dist/legacy/build/pdf.js' { export function getDocument(options:any):{promise:Promise<any>}; }
