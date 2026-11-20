@@ -93,7 +93,7 @@ function extractNamedSubjects(block: string, definitions: Array<{ label: string;
 }
 
 function parseFgvSeduc(text: string): ParsedEdital | null {
-  const normalized = normalize(text).replace(/\\[\\[PAGE:\\d+\\]\\]/g, ' ');
+  const normalized = normalize(text).replace(/\[\[PAGE:\d+\]\]/g, ' ');
   if (!normalized.includes('ANEXO V - CONTEUDO PROGRAMATICO') || !normalized.includes('ANEXO II - QUADRO DE VAGAS')) return null;
 
   const positions = extractFgvPositions(text);
@@ -101,14 +101,14 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
 
   // Preserve line breaks from PDF.js: discipline titles are standalone lines.
   const flat = text
-    .replace(/\\[\\[PAGE:\\d+\\]\\]/g, '\\n')
-    .replace(/[\\t ]+/g, ' ')
-    .replace(/\\n{3,}/g, '\\n\\n');
-  const contentStart = flat.search(/4\\.\\s*DO\\s+CONTE[ÚU]DO\\s+PROGRAM[ÁA]TICO/i);
+    .replace(/\[\[PAGE:\d+\]\]/g, '\n')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n');
+  const contentStart = flat.search(/4\.\s*DO\s+CONTE[ÚU]DO\s+PROGRAM[ÁA]TICO/i);
   if (contentStart < 0) return null;
   const content = flat.slice(contentStart);
 
-  const sectionMatches = Array.from(content.matchAll(/(?:^|\\n)[\\t ]*4\\.[\\t ]*(\\d+)\\.[^\\n]*/g));
+  const sectionMatches = Array.from(content.matchAll(/(?:^|\n)[\t ]*4\.[\t ]*(\d+)\.[^\n]*/g));
   const subjects: ParsedSubject[] = [];
   const commonBase = [
     { label: 'Língua Portuguesa', module: 'basic' as const, questions: 10 },
@@ -140,7 +140,7 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
     if (!sectionPositions.length) continue;
 
     // Remove accents without collapsing whitespace so offsets remain valid.
-    const normalizedSection = sectionText.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase();
+    const normalizedSection = sectionText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
     const basicIndex = normalizedSection.indexOf('CONHECIMENTOS BASICOS');
     const specificIndex = normalizedSection.indexOf('CONHECIMENTOS ESPECIFICOS');
     if (basicIndex >= 0 && specificIndex > basicIndex) {
