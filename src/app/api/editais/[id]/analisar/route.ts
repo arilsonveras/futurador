@@ -55,7 +55,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return fail('A análise gratuita por IA está pronta, mas falta configurar a chave da API Gemini no servidor. Nenhum serviço pago foi chamado.', 503);
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3.5-flash-lite';
 
   const prompt = `Você é um analista especializado em editais de concursos públicos brasileiros. Analise o conteúdo integral fornecido, respeitando a estrutura, os títulos, os anexos, os cargos e as tabelas.
 
