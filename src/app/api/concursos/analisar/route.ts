@@ -35,7 +35,9 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
  for(let pageNumber=1;pageNumber<=document.numPages;pageNumber++){
   const page=await document.getPage(pageNumber);
   const content=await page.getTextContent();
-  const text=content.items.map((item:any)=>typeof item.str==='string'?item.str:'').filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+  const rows=new Map<number,any[]>();
+  for(const item of content.items){if(typeof item.str!=='string'||!item.str.trim())continue;const y=Math.round((item.transform?.[5]||0)/2)*2;const row=rows.get(y)||[];row.push(item);rows.set(y,row);}
+  const text=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([,items])=>items.sort((a,b)=>(a.transform?.[4]||0)-(b.transform?.[4]||0)).map((item:any)=>item.str).join(' ').replace(/\s+/g,' ').trim()).filter(Boolean).join('\n');
   pages.push(text);
  }
  const normalized=pages.map(value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase());
@@ -68,7 +70,74 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
   remainingChars-=pageText.length;
  }
  const text=chunks.join('\n\n');
- return {pageCount:pages.length,selectedCount:selectedPages.length,text};
+ return {pageCount:pages.length,selectedCount:selectedPages.length,text,pages:selectedPages.map(index=>pages[index])};
+}
+
+
+function normalizeText(value:string){
+ return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string){
+ const warnings:string[]=[
+  'Extração realizada localmente, sem depender de um serviço de IA. Confira os trechos e páginas indicados antes de montar o cronograma.',
+  'A identificação automática de cargos e tópicos usa regras estruturais; tabelas complexas, anexos separados ou PDFs escaneados podem exigir conferência manual.'
+ ];
+ const all=pages.map((text,index)=>({text,normalized:normalizeText(text),page:index+1}));
+ const full=all.map(p=>'[PÁGINA '+p.page+']\n'+p.text).join('\n');
+ const normFull=normalizeText(full);
+ const docType=/demanda por vaga|candidato por vaga|relacao de candidatos|resultado final|classificacao final|gabarito definitivo/.test(normFull)?'demanda':
+  /edital de abertura|edital n[ºo.]|edital no/.test(normFull)?'edital_abertura':'incerto';
+ if(docType!=='edital_abertura'){
+  warnings.unshift('O documento não foi confirmado como edital de abertura integral. A extração local não vai presumir cargos ou conteúdo programático.');
+  return {documentType:docType,isOfficialNotice:false,examName:null,institution:null,organizer:null,examDate:null,positions:[],subjects:[],officialSource:true,warnings};
+ }
+ const dateMatch=full.match(/(?:prova objetiva|realizacao das provas|data da prova)[\s\S]{0,180}?(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})/i);
+ const examDate=dateMatch?dateMatch[3]+'-'+dateMatch[2].padStart(2,'0')+'-'+dateMatch[1].padStart(2,'0'):null;
+ const titleLine=all.slice(0,12).flatMap(p=>p.text.split(/\n/)).find(line=>/concurso publico|processo seletivo publico/i.test(line));
+ const institutionLine=all.slice(0,15).flatMap(p=>p.text.split(/\n/)).find(line=>/secretaria|prefeitura|universidade|tribunal|estado do|municipio de/i.test(line));
+ const positions:any[]=[];
+ const seenPositions=new Set<string>();
+ const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
+ const vacancyPages=all.filter(p=>/quadro de vagas|vagas imediatas|cadastro de reserva|cargo.{0,30}vagas|distribuicao das vagas/.test(p.normalized)).slice(0,12);
+ for(const p of vacancyPages){
+  for(const raw of p.text.split(/\n/)){
+   const line=raw.replace(/\s+/g,' ').trim();
+   if(line.length<5||line.length>125||!rolePattern.test(line))continue;
+   const name=line.replace(/^\d+(?:\.\d+)*[.)]?\s*/,'').trim();
+   const key=normalizeText(name);
+   if(seenPositions.has(key))continue;
+   seenPositions.add(key);
+   positions.push({name,category:null,formation:null,educationLevel:null,vacancies:null,immediateVacancies:null,reserveList:null,vacancyBreakdown:{general:null,disability:null,black:null,indigenous:null,quilombola:null},evidence:line.slice(0,260),sourcePage:p.page});
+  }
+ }
+ const syllabusIndex=all.findIndex((p,i)=>i>3&&p.normalized.length>300&&/(conteudo programatico|programa das provas|conhecimentos especificos|conhecimentos gerais)/.test(p.normalized));
+ const subjectNames=['Lingua Portuguesa','Matematica','Raciocinio Logico','Informatica','Legislacao','Direito Constitucional','Direito Administrativo','Conhecimentos Gerais','Conhecimentos Especificos','Didatica','Fundamentos da Educacao','Historia','Geografia','Biologia','Fisica','Quimica','Lingua Inglesa','Atualidades'];
+ const subjects:any[]=[];
+ const seenSubjects=new Set<string>();
+ if(syllabusIndex>=0){
+  for(const p of all.slice(syllabusIndex)){
+   const lines=p.text.split(/\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+   for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    const matched=subjectNames.find(name=>normalizeText(line).replace(/^[\d.\-)\s]+/,'')===normalizeText(name));
+    if(!matched)continue;
+    const key=normalizeText(matched);
+    if(seenSubjects.has(key))continue;
+    seenSubjects.add(key);
+    const topics:string[]=[];
+    for(let j=i+1;j<Math.min(lines.length,i+18);j++){
+     const candidate=lines[j];
+     if(subjectNames.some(n=>normalizeText(candidate).replace(/^[\d.\-)\s]+/,'')===normalizeText(n)))break;
+     if(candidate.length>18&&candidate.length<500&&(/^\d+(?:\.\d+)*[.)]?\s|^[a-z][.)]\s|^[-•]\s/i.test(candidate)||topics.length>0))topics.push(candidate.replace(/^(?:\d+(?:\.\d+)*[.)]?|[a-z][.)]|[-•])\s*/i,'').trim());
+    }
+    if(topics.length)subjects.push({name:matched,positionNames:[],scope:'common',module:/especificos|didatica|fundamentos/.test(key)?'specific':'basic',topics:[...new Set(topics)].slice(0,120),evidence:line+' — '+topics.slice(0,2).join('; '),sourcePage:p.page});
+   }
+  }
+ }
+ if(!positions.length)warnings.push('Os cargos não puderam ser extraídos com segurança das tabelas do edital. Nenhum cargo foi inventado.');
+ if(!subjects.length)warnings.push('Não foi possível reconhecer com segurança as disciplinas e os tópicos do conteúdo programático. O cronograma deve permanecer bloqueado até a conferência do anexo.');
+ if(!examDate)warnings.push('A data da prova não foi identificada com segurança no cronograma do edital.');
+ return {documentType:'edital_abertura',isOfficialNotice:true,examName:titleLine?.slice(0,180)||null,institution:institutionLine?.slice(0,180)||null,organizer:null,examDate,positions,subjects,officialSource:true,warnings,sourceUrl,documentUrl:sourceUrl,sourceType,extractionMode:'local'};
 }
 
 async function getSource(url:URL){
@@ -92,7 +161,7 @@ export async function POST(req:Request){
   const initialUrl=safeUrl(raw);
   if(!initialUrl)return NextResponse.json({error:'Endereço de fonte inválido. Use um link HTTPS público.'},{status:400});
   const key=process.env.GEMINI_API_KEY;
-  if(!key||process.env.FUTURADOR_AI_ENABLED!=='true')return NextResponse.json({error:'A análise automática por IA ainda não está disponível. Nenhuma cobrança foi feita.'},{status:503});
+  const aiEnabled=!!key&&process.env.FUTURADOR_AI_ENABLED==='true';
 
   let {response:source,url:sourceUrl}=await getSource(initialUrl);
   let buffer=await source.arrayBuffer();
@@ -100,6 +169,7 @@ export async function POST(req:Request){
   let type=(source.headers.get('content-type')||'').toLowerCase();
   let sourceType='web';
   let parts:any[]=[];
+  let localPages:string[]=[];
   let evidenceUrl=sourceUrl.toString();
 
   if(type.includes('pdf')||sourceUrl.pathname.toLowerCase().endsWith('.pdf')){
@@ -107,6 +177,7 @@ export async function POST(req:Request){
    try{
     const extracted=await extractRelevantPdfText(buffer);
     if(extracted.text.length>=2500){
+     localPages=extracted.pages;
      parts=[{text:'TEXTO EXTRAÍDO DO EDITAL EM PDF. O documento possui '+extracted.pageCount+' páginas; foram selecionadas '+extracted.selectedCount+' páginas iniciais e relevantes para cargos, vagas, cronograma e conteúdo programático. Preserve os números de página entre colchetes nas evidências.\n\n'+extracted.text}];
     }else{
      parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
@@ -148,6 +219,10 @@ export async function POST(req:Request){
     if(pageText.length<500)return NextResponse.json({error:'A página não contém texto suficiente. Procure o link direto do edital em PDF ou outra fonte oficial.'},{status:422});
     parts=[{text:'PÁGINA OFICIAL E LISTA DE DOCUMENTOS:\n'+pageText+'\n\nLINKS DOS ARQUIVOS:\n'+anchors.map(a=>a.label+' — '+a.href).filter(x=>x.trim()).slice(0,100).join('\n')}];
    }
+  }
+  if(!aiEnabled){
+   const local=localEditalExtraction(localPages.length?localPages:[htmlText(new TextDecoder().decode(buffer))],evidenceUrl,sourceType);
+   return NextResponse.json(local);
   }
   parts.push({text:`Você é especialista em leitura de editais de concursos públicos brasileiros. Faça uma extração minuciosa, priorizando o edital mais recente e suas retificações. Não use conhecimento externo nem invente dados.
 Responda exclusivamente JSON válido neste formato:
@@ -205,10 +280,14 @@ Documento efetivamente analisado: ${evidenceUrl}`});
    if(response?.ok)break;
    if(response?.status===429||response?.status===400||response?.status===401||response?.status===403)break;
   }
-  if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
+  if(!response||!response.ok){
+   const local=localEditalExtraction(localPages.length?localPages:[htmlText(new TextDecoder().decode(buffer))],evidenceUrl,sourceType);
+   local.warnings.unshift('O serviço de IA não respondeu. O Futurador concluiu uma tentativa de extração local; confira os resultados antes de continuar.');
+   return NextResponse.json(local);
+  }
   if(!response.ok){
-   if(response.status===429)return NextResponse.json({error:'O limite gratuito de uso da IA foi atingido ou a cota do projeto está indisponível. Confira o painel de uso do Google AI Studio. Nenhuma cobrança será ativada.'},{status:429});
-   if(response.status===503)return NextResponse.json({error:'O Google está temporariamente sem capacidade para atender a análise, mesmo após tentar outros modelos disponíveis na faixa gratuita. Aguarde alguns minutos e tente novamente. Nenhuma cobrança foi ativada.'},{status:503});
+   if(response.status===429){const local=localEditalExtraction(localPages,evidenceUrl,sourceType);local.warnings.unshift('A cota gratuita de IA está indisponível. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(local);}
+   if(response.status===503){const local=localEditalExtraction(localPages,evidenceUrl,sourceType);local.warnings.unshift('O Google está temporariamente sem capacidade. O Futurador utilizou a extração local como alternativa.');return NextResponse.json(local);}
    if(response.status>=500)return NextResponse.json({error:'O serviço de IA apresentou uma falha temporária (HTTP '+response.status+'). Tente novamente em alguns minutos.'},{status:503});
    return NextResponse.json({error:'O serviço de IA recusou a solicitação (HTTP '+response.status+'). Verifique a configuração da chave no painel do projeto.'},{status:502});
   }
