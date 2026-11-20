@@ -34,6 +34,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
     subjectName: subjectNames.get(topic.subject_id) || 'Disciplina',
     positionId: (subjects || []).find(subject => subject.id === topic.subject_id)?.position_id || null,
     scopeType: (subjects || []).find(subject => subject.id === topic.subject_id)?.scope_type || 'unassigned',
+    questionCount: (subjects || []).find(subject => subject.id === topic.subject_id)?.question_count || null,
     positionIds: subjectPositionMap.get(topic.subject_id) || [],
   }));
 
