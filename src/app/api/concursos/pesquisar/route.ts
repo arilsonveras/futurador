@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 35;
+export const maxDuration = 45;
 
 type Result = { title: string; url: string; snippet: string; source: string };
 
@@ -29,13 +29,13 @@ function target(raw: string) {
 function rank(item: Result, terms: string[]) {
   const value = (item.url + ' ' + item.title + ' ' + item.snippet).toLowerCase();
   let score = 0;
-  if (value.includes('conhecimento.fgv.br/concursos')) score += 120;
-  if (value.includes('gov.br') || value.includes('.pa.gov.br')) score += 45;
-  if (/edital|concurso|processo seletivo/.test(value)) score += 18;
-  if (/resultado|gabarito|classifica[cç][aã]o|demanda por vaga/.test(value)) score -= 12;
+  if (value.includes('conhecimento.fgv.br/concursos')) score += 150;
+  if (value.includes('gov.br') || value.includes('.pa.gov.br')) score += 55;
+  if (/edital|concurso|processo seletivo/.test(value)) score += 20;
+  if (/resultado|gabarito|classifica[cç][aã]o|demanda por vaga/.test(value)) score -= 10;
   for (const term of terms) {
     const normalized = term.toLowerCase();
-    if (normalized.length > 2 && value.includes(normalized)) score += 4;
+    if (normalized.length > 1 && value.includes(normalized)) score += 6;
   }
   return score;
 }
@@ -43,59 +43,72 @@ function rank(item: Result, terms: string[]) {
 async function search(term: string): Promise<Result[]> {
   const response = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(term), {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Futurador/1.0)', Accept: 'text/html' },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(12000),
     cache: 'no-store',
   });
   if (!response.ok) return [];
   const html = await response.text();
-  const matches = [...html.matchAll(/<a\b(?=[^>]*\bclass=["'][^"']*result__a)(?=[^>]*\bhref=["']([^"']+)["'])[^>]*>([\s\S]*?)<\/a>/gi)];
+  const anchors = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)];
   const output: Result[] = [];
-  for (const match of matches) {
-    const href = match[1] || match[0].match(/\bhref=["']([^"']+)["']/i)?.[1];
+  for (const match of anchors) {
+    const attrs = match[1] || '';
+    if (!/class\s*=\s*["'][^"']*result__a/i.test(attrs)) continue;
+    const href = attrs.match(/href\s*=\s*["']([^"']+)["']/i)?.[1];
     const url = href ? target(href) : null;
     if (!url) continue;
-    const around = html.slice(Math.max(0, match.index! - 1600), Math.min(html.length, match.index! + 3000));
-    const snippetMatch = around.match(/class=["']result__snippet["'][^>]*>([\s\S]*?)<\/div>/i);
+    const around = html.slice(Math.max(0, match.index! - 1800), Math.min(html.length, match.index! + 3500));
+    const snippetMatch = around.match(/class\s*=\s*["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
     let source = '';
     try { source = new URL(url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
-    output.push({ title: clean(match[2]).slice(0, 220), url, snippet: snippetMatch ? clean(snippetMatch[1]).slice(0, 420) : '', source });
+    output.push({ title: clean(match[2]).slice(0, 240), url, snippet: snippetMatch ? clean(snippetMatch[1]).slice(0, 500) : '', source });
   }
   return output;
+}
+
+function addQueryVariants(query: string, year: string | null, isSeducPa: boolean) {
+  const base = query.replace(/\b20\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
+  const terms = new Set<string>();
+  const add = (value: string) => { if (value.trim()) terms.add(value.trim()); };
+
+  // A busca base permanece ampla. Cada palavra extra aumenta a relevância,
+  // mas não exige correspondência literal de todos os termos para retornar resultados.
+  add(query + ' concurso');
+  add(query + ' edital');
+  add(query + ' banca organizadora');
+  add(query + ' cargos vagas');
+  if (year) {
+    add(base + ' ' + year + ' concurso');
+    add(base + ' ' + year + ' edital oficial');
+    add(base + ' ' + year + ' cargos conteúdo programático');
+  }
+
+  if (isSeducPa) {
+    const suffix = year ? ' ' + year : '';
+    add('SEDUC Pará concurso' + suffix);
+    add('SEDUC-PA concurso' + suffix);
+    add('Secretaria de Estado de Educação do Pará concurso' + suffix);
+    add('SEDUC Pará edital banca FGV' + suffix);
+    add('site:conhecimento.fgv.br/concursos SEDUC Pará' + suffix);
+  }
+  return [...terms];
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
     const query = typeof body?.query === 'string' ? body.query.trim() : '';
-    if (query.length < 3 || query.length > 160) {
-      return NextResponse.json({ error: 'Informe o nome do concurso (de 3 a 160 caracteres).' }, { status: 400 });
+    if (query.length < 2 || query.length > 160) {
+      return NextResponse.json({ error: 'Informe o nome do concurso (de 2 a 160 caracteres).' }, { status: 400 });
     }
 
-    const normalized = query.replace(/[.,;:_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[.,;:_-]+/g, ' ').replace(/\s+/g, ' ').trim();
     const yearMatch = normalized.match(/\b20\d{2}\b/);
     const year = yearMatch?.[0] || null;
-    const base = normalized.replace(/\b20\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
-    const searchTerms = year
-      ? [
-          normalized + ' concurso edital',
-          normalized + ' página oficial',
-          base + ' ' + year + ' banca organizadora',
-          base + ' ' + year + ' cargos conteúdo programático',
-          base + ' ' + year,
-        ]
-      : [
-          normalized,
-          normalized + ' concurso',
-          normalized + ' edital',
-          normalized + ' banca organizadora',
-          normalized + ' cargos prova conteúdo programático',
-        ];
-
     const lower = normalized.toLowerCase();
-    const isSeducPa = /seduc/.test(lower) && /\bpa\b|pará|para/.test(lower);
-    if (isSeducPa && year === '2026') {
-      searchTerms.unshift('site:conhecimento.fgv.br/concursos/seducpa26 SEDUC Pará 2026 FGV edital');
-    }
+    const isSeducPa = /seduc/.test(lower) && /\bpa\b|para/.test(lower);
+    const searchTerms = addQueryVariants(normalized, year, isSeducPa);
+    searchTerms.unshift(normalized);
 
     const batches = await Promise.all(searchTerms.map((term) => search(term).catch(() => [])));
     const unique = new Map<string, Result>();
@@ -104,23 +117,25 @@ export async function POST(req: Request) {
       if (!previous || item.snippet.length > previous.snippet.length) unique.set(item.url, item);
     }
 
-    if (isSeducPa && year === '2026') {
+    // A página oficial da FGV deve aparecer mesmo que o buscador não interprete a sigla "PA".
+    if (isSeducPa) {
       const official = 'https://conhecimento.fgv.br/concursos/seducpa26';
       unique.set(official, {
-        title: 'Concurso Público SEDUC-PA 2026 — FGV Conhecimento (página oficial)',
+        title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (página oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (página oficial)',
         url: official,
-        snippet: 'Página oficial do concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais.',
+        snippet: 'Página oficial da FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais da edição 2026.',
         source: 'conhecimento.fgv.br',
       });
     }
 
     let results = [...unique.values()];
-    // Quando o usuário informa um ano, não misturar concursos de outras edições.
+    // O ano só restringe quando foi digitado explicitamente pelo candidato.
     if (year) {
       results = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
     }
-    results.sort((a, b) => rank(b, [base, year || '']) - rank(a, [base, year || '']));
-    // Mantém todos os resultados únicos retornados pela pesquisa para a pessoa escolher.
+
+    const queryWords = normalized.split(/\s+/).filter(word => word.length > 1 && !/^20\d{2}$/.test(word));
+    results.sort((a, b) => rank(b, queryWords) - rank(a, queryWords));
 
     return NextResponse.json({
       query,
@@ -129,8 +144,8 @@ export async function POST(req: Request) {
       searchMode: year ? 'year-filtered' : 'broad',
       yearFilter: year,
       message: year
-        ? 'Resultados limitados ao ano informado.'
-        : 'Busca ampliada: selecione o resultado que corresponde ao concurso desejado.',
+        ? 'Resultados filtrados para o ano informado.'
+        : 'Resultados ampliados. Acrescente banca, órgão ou ano para refinar a pesquisa.',
     });
   } catch {
     return NextResponse.json({ error: 'O serviço de pesquisa não respondeu. Tente novamente em instantes.' }, { status: 502 });
