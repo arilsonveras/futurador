@@ -19,6 +19,11 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
     .select('id,name,sort_order,position_id,scope_type').eq('exam_id', id).order('sort_order');
   const { data: positions } = await supabase.from('exam_positions').select('id,name,code,sort_order').eq('exam_id', id).order('sort_order');
   const subjectIds = (subjects || []).map(subject => subject.id);
+  const { data: subjectPositionRows } = subjectIds.length
+    ? await supabase.from('subject_positions').select('subject_id,position_id').in('subject_id', subjectIds)
+    : { data: [] };
+  const subjectPositionMap = new Map<string, string[]>();
+  for (const row of subjectPositionRows || []) subjectPositionMap.set(row.subject_id, [...(subjectPositionMap.get(row.subject_id) || []), row.position_id]);
   const { data: topicRows } = subjectIds.length
     ? await supabase.from('topics').select('id,title,subject_id,sort_order').in('subject_id', subjectIds).order('sort_order')
     : { data: [] };
@@ -29,6 +34,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
     subjectName: subjectNames.get(topic.subject_id) || 'Disciplina',
     positionId: (subjects || []).find(subject => subject.id === topic.subject_id)?.position_id || null,
     scopeType: (subjects || []).find(subject => subject.id === topic.subject_id)?.scope_type || 'unassigned',
+    positionIds: subjectPositionMap.get(topic.subject_id) || [],
   }));
 
   const { data: availability } = await supabase.from('study_availability')
