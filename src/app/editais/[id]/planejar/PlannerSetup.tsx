@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 type Availability = { weekday: number; start_time: string; end_time: string };
-type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string };
+type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string; positionIds: string[] };
 type Position = { id: string; name: string; code: string | null; sort_order: number };
 type Knowledge = 'nao_estudei' | 'dificuldade' | 'regular' | 'domino';
 type Props = {
@@ -39,7 +39,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
   const [selectedPositionId, setSelectedPositionId] = useState(positions[0]?.id || '');
   const [targetDate, setTargetDate] = useState(examDate || '');
   const selectedPosition = positions.find(position => position.id === selectedPositionId);
-  const selectedTopics = useMemo(() => topics.filter(topic => topic.scopeType === 'common' || (topic.scopeType === 'specific' && topic.positionId === selectedPositionId)), [topics, selectedPositionId]);
+  const selectedTopics = useMemo(() => topics.filter(topic => (topic.scopeType === 'common' && (!topic.positionIds.length || topic.positionIds.includes(selectedPositionId))) || (topic.scopeType === 'specific' && topic.positionId === selectedPositionId)), [topics, selectedPositionId]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [planId, setPlanId] = useState(existingPlanId);
