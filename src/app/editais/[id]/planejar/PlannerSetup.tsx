@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 type Availability = { weekday: number; start_time: string; end_time: string };
 type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string };
 type Position = { id: string; name: string; code: string | null; sort_order: number };
+type Knowledge = 'nao_estudei' | 'dificuldade' | 'regular' | 'domino';
 type Props = {
   examId: string;
   examTitle: string;
@@ -43,6 +44,15 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
   const [planId, setPlanId] = useState(existingPlanId);
   const [duration, setDuration] = useState(50);
   const activeDays = useMemo(() => Object.values(availability).filter(day => day.enabled).length, [availability]);
+  const subjectNames = useMemo(() => Array.from(new Set(selectedTopics.map(topic => topic.subjectName))), [selectedTopics]);
+  const [knowledge, setKnowledge] = useState<Record<string, Knowledge>>({});
+  const weightedTopics = useMemo(() => {
+    const weights: Record<Knowledge, number> = { nao_estudei: 3, dificuldade: 3, regular: 2, domino: 1 };
+    return subjectNames.flatMap(name => {
+      const subjectTopics = selectedTopics.filter(topic => topic.subjectName === name);
+      return Array.from({ length: weights[knowledge[name] || 'regular'] }, () => subjectTopics).flat();
+    });
+  }, [selectedTopics, subjectNames, knowledge]);
 
   function updateDay(day: number, field: 'enabled' | 'start' | 'end', value: boolean | string) {
     setAvailability(old => ({ ...old, [day]: { ...old[day], [field]: value } }));
@@ -131,7 +141,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
       let cursor = minutes(available.start);
       const finish = minutes(available.end);
       while (cursor + duration <= finish && tasks.length < 500) {
-        const topic = selectedTopics[topicIndex % selectedTopics.length];
+        const topic = weightedTopics[topicIndex % weightedTopics.length];
         const hour = String(Math.floor(cursor / 60)).padStart(2, '0');
         const minute = String(cursor % 60).padStart(2, '0');
         tasks.push({
@@ -177,6 +187,21 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
         {positions.length > 0 ? <div className="field"><label htmlFor="position">Qual cargo/área você vai prestar?</label><select id="position" value={selectedPositionId} onChange={e => setSelectedPositionId(e.target.value)}>{positions.map(position => <option key={position.id} value={position.id}>{position.code ? position.code + ' — ' : ''}{position.name}</option>)}</select></div> : <p className="message error">Não encontramos cargos vinculados a este edital. Volte à análise antes de montar o cronograma.</p>}
         <p>Encontramos <strong>{selectedTopics.length} tópicos</strong> para este cargo, incluindo conteúdos comuns e específicos. Informe os dias e horários em que você consegue estudar.</p>
         {examDate ? <p className="muted">Data da prova: {new Date(examDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p> : <p className="muted">Sem data de prova cadastrada: o primeiro cronograma será de 8 semanas.</p>}
+        {subjectNames.length > 0 && <>
+          <h2>Seu nível em cada disciplina</h2>
+          <p className="muted">Isso ajuda o Futurador a reservar mais sessões para as matérias em que você ainda precisa avançar.</p>
+          <div className="availability-list">
+            {subjectNames.map(name => <div className="availability-day" key={name}>
+              <strong>{name}</strong>
+              <select aria-label={'Seu nível em ' + name} value={knowledge[name] || 'regular'} onChange={e => setKnowledge(old => ({ ...old, [name]: e.target.value as Knowledge }))}>
+                <option value="nao_estudei">Ainda não estudei</option>
+                <option value="dificuldade">Tenho dificuldade</option>
+                <option value="regular">Tenho conhecimento básico/intermediário</option>
+                <option value="domino">Tenho bom domínio</option>
+              </select>
+            </div>)}
+          </div>
+        </>}
         <div className="field">
           <label htmlFor="duration">Duração de cada sessão</label>
           <select id="duration" value={duration} onChange={e => setDuration(Number(e.target.value))}>
@@ -198,7 +223,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
         </div>
         <p className="muted">{activeDays} dia(s) selecionado(s).</p>
         {message && <p className={message.startsWith('Cronograma criado') ? 'message' : 'message error'}>{message}</p>}
-        {planId ? <p><Link className="btn" href={'/cronograma/' + planId}>Abrir meu cronograma</Link></p> : <button className="btn" type="button" onClick={saveAndGenerate} disabled={busy || !positions.length || !selectedTopics.length}>{busy ? 'Montando cronograma...' : 'Salvar horários e gerar cronograma'}</button>}
+        {planId ? <p><Link className="btn" href={'/cronograma/' + planId}>Abrir meu cronograma</Link></p> : <button className="btn" type="button" onClick={saveAndGenerate} disabled={busy || !positions.length || !selectedTopics.length || !weightedTopics.length}>{busy ? 'Montando cronograma...' : 'Salvar horários e gerar cronograma'}</button>}
       </section>
     </main>
   );
