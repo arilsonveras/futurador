@@ -73,3 +73,14 @@ a { color: #3157c8; }
   .task-card { align-items: flex-start; flex-direction: column; }
   .task-card .btn { width: 100%; text-align: center; }
 }
+
+
+.topic-preview {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  width: 100%;
+  color: var(--muted, #64748b);
+  font-size: 0.9rem;
+}
+.topic-preview li { margin: 4px 0; }
+.topic-preview small { color: var(--muted, #64748b); }
