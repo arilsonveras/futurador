@@ -192,6 +192,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
 
   return (
     <main className="wrap">
+      {busy && <FullScreenLoader mode="plan" />}
       <nav className="nav"><Link className="brand" href="/">futurador.</Link><Link href="/painel">Voltar ao painel</Link></nav>
       <section className="panel">
         <h1>Montar seu cronograma</h1>
