@@ -7,6 +7,9 @@ export type ParsedSubject = {
   module?: 'basic' | 'specific';
   questionCount?: number | null;
   examStage?: string;
+  sourcePage?: number | null;
+  sourceExcerpt?: string | null;
+  topicSources?: Array<{ title: string; sourcePage: number; sourceExcerpt: string }>;
 };
 export type ParsedPosition = {
   name: string;
@@ -14,6 +17,8 @@ export type ParsedPosition = {
   formation?: string | null;
   educationLevel?: string | null;
   sourceAnnex?: string | null;
+  sourcePage?: number | null;
+  sourceExcerpt?: string | null;
 };
 export type ParsedEdital = { positions: ParsedPosition[]; subjects: ParsedSubject[]; warnings: string[] };
 
