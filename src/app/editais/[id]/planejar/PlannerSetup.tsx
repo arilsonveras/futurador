@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import FullScreenLoader from '@/components/FullScreenLoader';
 
 type Availability = { weekday: number; start_time: string; end_time: string };
 type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string; positionIds: string[]; questionCount: number | null };
