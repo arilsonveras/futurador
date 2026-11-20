@@ -37,6 +37,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
     return result;
   });
   const [selectedPositionId, setSelectedPositionId] = useState(positions[0]?.id || '');
+  const [targetDate, setTargetDate] = useState(examDate || '');
   const selectedPosition = positions.find(position => position.id === selectedPositionId);
   const selectedTopics = useMemo(() => topics.filter(topic => topic.scopeType === 'common' || (topic.scopeType === 'specific' && topic.positionId === selectedPositionId)), [topics, selectedPositionId]);
   const [busy, setBusy] = useState(false);
@@ -81,7 +82,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const end = examDate ? new Date(examDate + 'T00:00:00') : new Date(today.getTime() + 56 * 86400000);
+    const end = targetDate ? new Date(targetDate + 'T00:00:00') : new Date(today.getTime() + 56 * 86400000);
     if (end <= today) {
       setMessage('A data da prova já passou. Atualize a data do concurso para montar o cronograma.');
       return;
@@ -112,6 +113,15 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
       setMessage('Não foi possível salvar seus horários: ' + availabilityError.message);
       setBusy(false);
       return;
+    }
+
+    if (targetDate && targetDate !== examDate) {
+      const { error: dateError } = await supabase.from('exams').update({ exam_date: targetDate }).eq('id', examId);
+      if (dateError) {
+        setMessage('Não foi possível atualizar a data da prova: ' + dateError.message);
+        setBusy(false);
+        return;
+      }
     }
 
     const startDate = dateKey(today);
@@ -186,7 +196,11 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
         <p className="muted">{examTitle}</p>
         {positions.length > 0 ? <div className="field"><label htmlFor="position">Qual cargo/área você vai prestar?</label><select id="position" value={selectedPositionId} onChange={e => setSelectedPositionId(e.target.value)}>{positions.map(position => <option key={position.id} value={position.id}>{position.code ? position.code + ' — ' : ''}{position.name}</option>)}</select></div> : <p className="message error">Não encontramos cargos vinculados a este edital. Volte à análise antes de montar o cronograma.</p>}
         <p>Encontramos <strong>{selectedTopics.length} tópicos</strong> para este cargo, incluindo conteúdos comuns e específicos. Informe os dias e horários em que você consegue estudar.</p>
-        {examDate ? <p className="muted">Data da prova: {new Date(examDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p> : <p className="muted">Sem data de prova cadastrada: o primeiro cronograma será de 8 semanas.</p>}
+        <div className="field">
+          <label htmlFor="targetDate">Quando será a prova? (se a data ainda não foi divulgada, deixe em branco)</label>
+          <input id="targetDate" type="date" value={targetDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setTargetDate(e.target.value)} />
+          {!targetDate && <p className="muted">Sem data definida: o cronograma será organizado inicialmente para 8 semanas.</p>}
+        </div>
         {subjectNames.length > 0 && <>
           <h2>Seu nível em cada disciplina</h2>
           <p className="muted">Isso ajuda o Futurador a reservar mais sessões para as matérias em que você ainda precisa avançar.</p>
