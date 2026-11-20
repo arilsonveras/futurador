@@ -13,17 +13,6 @@ export type ParsedEdital = {
   warnings: string[];
 };
 
-const structuralHeadings = new Set([
-  'CONHECIMENTOS BÁSICOS',
-  'CONHECIMENTOS GERAIS',
-  'CONHECIMENTOS ESPECÍFICOS',
-  'CONHECIMENTOS DO CARGO',
-  'CONTEÚDO PROGRAMÁTICO',
-  'CONTEÚDOS PROGRAMÁTICOS',
-  'DOS OBJETOS DE AVALIAÇÃO',
-  'HABILIDADES',
-]);
-
 function normalize(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 }
@@ -33,13 +22,13 @@ function clean(value: string) {
 }
 
 function positionFromLine(line: string): ParsedPosition | null {
-  const explicit = line.match(/^\s*(?:\d+(?:\.\d+)*\s*)?CARGO\s*\d+\s*[:–—-]\s*(.{3,100})$/i);
+  const explicit = line.match(/^\s*(?:\d+(?:\.\d+)*\s*)?CARGO\s*\d+\s*[:–—-]\s*(.{3,110})$/i);
   if (explicit) return { name: clean(explicit[1]).replace(/[.;:]$/, ''), code: null };
 
-  const specific = line.match(/CONHECIMENTOS ESPECIFICOS\s+PARA\s+O\s+CARGO\s+DE\s+(.+?)(?:\s+[-–—]\s+QUADRO\s+[IVX]+)?$/i);
+  const specific = line.match(/^(?:[IVX]+\.\s*)?CONHECIMENTOS ESPEC[IÍ]FICOS\s+PARA\s+O\s+CARGO\s+DE\s+(.+?)(?:\s+[-–—]\s+QUADRO\s+[IVX]+)?$/i);
   if (specific) return { name: clean(specific[1]).replace(/[.;:]$/, ''), code: null };
 
-  const fcc = line.match(/^\s*([A-Z]\d{2})\s*[–—-]\s*((?:ANALISTA|TECNICO|OFICIAL|AUXILIAR|ASSISTENTE).{3,110})$/i);
+  const fcc = line.match(/^\s*([A-Z]\d{2})\s*[–—-]\s*((?:ANALISTA|T[ÉE]CNICO|OFICIAL|AUXILIAR|ASSISTENTE).{3,110})$/i);
   if (fcc) return { name: clean(fcc[2]).replace(/[.;:]$/, ''), code: fcc[1] };
 
   return null;
@@ -49,18 +38,20 @@ function isSubjectHeading(line: string) {
   const value = clean(line);
   if (!value || value.length > 105 || value.length < 3) return false;
   const normalized = normalize(value);
-  if (structuralHeadings.has(normalized)) return false;
+  if (['CONHECIMENTOS BASICOS', 'CONHECIMENTOS GERAIS', 'CONHECIMENTOS ESPECIFICOS', 'CONHECIMENTOS DO CARGO', 'CONTEUDO PROGRAMATICO', 'CONTEUDOS PROGRAMATICOS', 'DOS OBJETOS DE AVALIACAO', 'HABILIDADES'].includes(normalized)) return false;
   if (/^(ANEXO|APENDICE|CARGO|QUADRO|PARTE|PROVA|ETAPA|CAPITULO|ITEM)\b/.test(normalized)) return false;
   if (/^\d+(?:\.\d+)*\s/.test(value) && value.length > 75) return false;
   const letters = value.replace(/[^A-Za-zÀ-ÿ]/g, '');
   if (letters.length < 3) return false;
   const upper = letters.replace(/[a-zà-ÿ]/g, '').length;
-  return upper / letters.length >= 0.78 && !/[.!?]$/.test(value);
+  return upper / letters.length >= 0.72 && !/[.!?]$/.test(value);
 }
 
 function isCommonSection(line: string) {
   const value = normalize(line);
-  return /^(?:[IVX]+\\.\\s*)?CONHECIMENTOS (BASICOS|GERAIS).*PARA TODOS|^(?:[IVX]+\\.\\s*)?CONHECIMENTOS BASICOS PARA CARGOS|CONHECIMENTOS GERAIS PARA TODOS OS CARGOS/.test(value);
+  return /^(?:[IVX]+\.\s*)?CONHECIMENTOS (BASICOS|GERAIS).*PARA TODOS/.test(value)
+    || /^(?:[IVX]+\.\s*)?CONHECIMENTOS BASICOS PARA CARGOS/.test(value)
+    || /CONHECIMENTOS GERAIS PARA TODOS OS CARGOS/.test(value);
 }
 
 export function parseEditalText(rawText: string): ParsedEdital {
@@ -76,16 +67,14 @@ export function parseEditalText(rawText: string): ParsedEdital {
     if (found) addPosition(found);
   }
 
-  const contentStart = (() => {
-    const annex = lines.findIndex(line => /ANEXO\s+[IVX]+/.test(normalize(line)) && /CONTEUDO PROGRAMATICO|OBJETOS DE AVALIACAO/.test(normalize(lines.slice(lines.indexOf(line), lines.indexOf(line) + 8).join(' '))));
-    if (annex >= 0) return annex;
-    const objects = lines.findIndex(line => /DOS OBJETOS DE AVALIACAO/.test(normalize(line)));
-    if (objects >= 0) return objects;
-    return lines.findIndex(line => /CONTEUDO PROGRAMATICO/.test(normalize(line)));
-  })();
+  let contentStart = lines.findIndex((line, index) =>
+    /ANEXO\s+[IVX]+/.test(normalize(line))
+    && /CONTEUDO PROGRAMATICO|OBJETOS DE AVALIACAO/.test(normalize(lines.slice(index, index + 8).join(' ')))
+  );
+  if (contentStart < 0) contentStart = lines.findIndex(line => /DOS OBJETOS DE AVALIACAO/.test(normalize(line)));
+  if (contentStart < 0) contentStart = lines.findIndex(line => /CONTEUDO PROGRAMATICO/.test(normalize(line)));
 
-  const start = contentStart >= 0 ? contentStart : 0;
-  const relevant = lines.slice(start);
+  const relevant = lines.slice(contentStart >= 0 ? contentStart : 0);
   const subjects: ParsedSubject[] = [];
   let activePosition: string | null = null;
   let commonMode = false;
@@ -114,7 +103,7 @@ export function parseEditalText(rawText: string): ParsedEdital {
       continue;
     }
 
-    if (/^CONHECIMENTOS ESPECIFICOS\b/.test(normalized) || /^CONHECIMENTOS DO CARGO\b/.test(normalized)) {
+    if (/^(?:[IVX]+\.\s*)?CONHECIMENTOS ESPECIFICOS\b/.test(normalized) || /^CONHECIMENTOS DO CARGO\b/.test(normalized)) {
       flush();
       commonMode = false;
       continue;
@@ -139,11 +128,10 @@ export function parseEditalText(rawText: string): ParsedEdital {
   flush();
 
   const warnings: string[] = [];
-  if (!positions.length) warnings.push('Não foi possível reconhecer automaticamente os cargos. Será necessário cadastrá-los na conferência.');
+  if (!positions.length) warnings.push('Não foi possível reconhecer automaticamente os cargos. Será necessário conferir o edital antes de salvar.');
   if (!subjects.length) warnings.push('Não foi possível separar disciplinas e tópicos com segurança. Confira o texto extraído antes de salvar.');
   if (subjects.some(subject => subject.scope === 'common') && !relevant.some(isCommonSection)) {
     warnings.push('Há conteúdos sem vínculo explícito com um cargo. Confirme se são comuns a todos ou se pertencem a uma área específica.');
   }
-
   return { positions, subjects, warnings };
 }
