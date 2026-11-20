@@ -37,19 +37,21 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
         const items = content.items as Array<{ str?: string; transform?: number[] }>;
+        const positioned = items
+          .filter(item => (item.str || '').trim())
+          .map(item => ({
+            value: item.str || '',
+            x: item.transform?.[4] ?? 0,
+            y: item.transform?.[5] ?? 0,
+          }))
+          .sort((a, b) => b.y - a.y || a.x - b.x);
         let pageText = '';
-        let previousY: number | null = null;
-        for (const item of items) {
-          const value = item.str || '';
-          if (!value.trim()) continue;
-          const y = item.transform?.[5];
-          if (previousY !== null && typeof y === 'number' && Math.abs(y - previousY) > 2) {
-            pageText += '\n';
-          } else if (pageText && !pageText.endsWith('\n')) {
-            pageText += ' ';
-          }
-          pageText += value;
-          if (typeof y === 'number') previousY = y;
+        let rowY: number | null = null;
+        for (const item of positioned) {
+          if (rowY !== null && Math.abs(item.y - rowY) > 2) pageText += '\n';
+          else if (pageText && !pageText.endsWith('\n')) pageText += ' | ';
+          pageText += item.value;
+          rowY = item.y;
         }
         text += '[[PAGE:' + pageNumber + ']]\n' + pageText + '\n';
       }
