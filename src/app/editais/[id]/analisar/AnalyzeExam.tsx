@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.js';
-import { parseEditalText, type ParsedEdital } from '@/lib/edital-parser';
+import type { ParsedEdital } from '@/lib/edital-parser';
 
 GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -24,7 +24,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
 
   async function extractPdf() {
     setExtracting(true);
-    setMessage('Lendo o edital completo e procurando cargos, anexos e conteúdos programáticos...');
+    setMessage('Lendo o edital e organizando o conteúdo por página, tabelas e seções...');
     try {
       const supabase = createClient();
       const { data, error } = await supabase.storage.from('edital-pdfs').download(filePath);
@@ -54,11 +54,19 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
         text += '[[PAGE:' + pageNumber + ']]\n' + pageText + '\n';
       }
       if (!text.trim()) throw new Error('O PDF não contém texto selecionável. Este arquivo precisa de OCR.');
-      const parsed = parseEditalText(text);
+      setMessage('Enviando o texto organizado por página para a análise inteligente...');
+      const response = await fetch('/api/editais/' + examId + '/analisar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pageCount: pdf.numPages }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível concluir a análise por IA.');
+      const parsed = payload as ParsedEdital;
       setResult(parsed);
       setMessage(parsed.subjects.length
-        ? 'Leitura concluída. Confira a separação por cargo antes de salvar.'
-        : 'O texto foi extraído, mas a estrutura do conteúdo programático não foi reconhecida com segurança.');
+        ? 'Análise por IA concluída. Confira cargos, vínculos e evidências antes de salvar.'
+        : 'A IA não encontrou uma estrutura segura para este edital.');
     } catch (error) {
       setMessage('Falha ao analisar o PDF: ' + (error instanceof Error ? error.message : 'erro desconhecido'));
     } finally {
@@ -96,7 +104,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
     const { data: insertedPositions, error: positionError } = await supabase
       .from('exam_positions')
       .insert(result.positions.map((position, index) => ({
-        user_id: user.id, exam_id: examId, name: position.name, code: position.code, formation: position.formation || null, education_level: position.educationLevel || null, source_annex: position.sourceAnnex || null, source_page: null, sort_order: index,
+        user_id: user.id, exam_id: examId, name: position.name, code: position.code, formation: position.formation || null, education_level: position.educationLevel || null, source_annex: position.sourceAnnex || null, source_page: position.sourcePage ?? null, sort_order: index,
       })))
       .select('id,name');
     if (positionError || !insertedPositions?.length) {
@@ -121,6 +129,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
         module: subject.module || null,
         question_count: subject.questionCount ?? null,
         exam_stage: subject.examStage || null,
+        source_page: subject.sourcePage ?? null,
       }).select('id').single();
       if (subjectError || !inserted) {
         setMessage('Erro ao salvar a disciplina ' + subject.name + ': ' + (subjectError?.message || 'registro não retornado'));
@@ -176,7 +185,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
     <main className="wrap">
       <nav className="nav"><Link className="brand" href="/">futurador.</Link><Link href="/painel">Voltar ao painel</Link></nav>
       <section className="panel">
-        <h1>Análise estruturada do edital</h1>
+        <h1>Análise inteligente do edital</h1>
         <p className="muted">{examTitle}</p>
         {alreadyHasSubjects && <p className="message">Este edital já possui uma análise anterior. A nova estrutura será gravada separadamente; os dados antigos e cronogramas existentes não serão apagados.</p>}
         {extracting && <p className="message">{message}</p>}
@@ -185,7 +194,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
             <h2>Cargos identificados ({result.positions.length})</h2>
             {counts.map((position, index) => (
               <div className="availability-day" key={position.name}>
-                <strong>{position.code ? position.code + ' — ' : ''}{position.name}</strong>
+                <strong>{position.code ? position.code + ' — ' : ''}{position.name}</strong>\n                {position.sourcePage && <small>Fonte: página {position.sourcePage}</small>}
                 <span>{position.subjects.length} disciplina(s) vinculadas</span>
                 <ul className="topic-preview">{position.subjects.map(subject => <li key={subject.name}>{subject.name} <small>({subject.scope === 'common' ? 'comum ao grupo' : 'específica'}) · {subject.topics.length} tópico(s)</small></li>)}</ul>
               </div>
