@@ -53,9 +53,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (process.env.FUTURADOR_AI_ENABLED !== 'true') {
     return fail('A análise por inteligência artificial está preparada, mas ainda não foi ativada. Nenhum serviço pago foi chamado.', 503);
   }
-  const model = process.env.FUTURADOR_AI_MODEL;
-  const token = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (!model || !token) return fail('A integração de IA ainda não está configurada no servidor.', 503);
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return fail('A análise gratuita por IA está pronta, mas falta configurar a chave da API Gemini no servidor. Nenhum serviço pago foi chamado.', 503);
+  const model = 'gemini-2.5-flash';
 
   const prompt = `Você é um analista especializado em editais de concursos públicos brasileiros. Analise o conteúdo integral fornecido, respeitando a estrutura, os títulos, os anexos, os cargos e as tabelas.
 
@@ -82,38 +82,46 @@ Use null quando a informação não estiver expressa. module deve ser "basic" ou
 PÁGINAS DO EDITAL (marcadores [[PAGE:n]]):
 ${text}`;
 
-  let gatewayResponse: Response;
+  let geminiResponse: Response;
   try {
-    gatewayResponse = await fetch('https://ai-gateway.vercel.sh/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: 'Responda somente JSON válido, seguindo exatamente o esquema solicitado.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.1,
-        max_tokens: 14000,
-      }),
-      signal: AbortSignal.timeout(55_000),
-    });
+    geminiResponse = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: 'Responda somente JSON válido, seguindo exatamente o esquema solicitado.' }],
+          },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 14000,
+            responseMimeType: 'application/json',
+          },
+        }),
+        signal: AbortSignal.timeout(55_000),
+      }
+    );
   } catch {
-    return fail('Não foi possível conectar ao serviço de IA. Tente novamente mais tarde.', 502);
+    return fail('Não foi possível conectar ao Gemini. Tente novamente mais tarde.', 502);
   }
 
-  if (!gatewayResponse.ok) {
-    const status = gatewayResponse.status;
-    if (status === 401 || status === 403) return fail('A autenticação do serviço de IA não foi aceita. Verifique a configuração do servidor.', 502);
-    if (status === 402) return fail('O serviço de IA informou que não há créditos disponíveis. Nenhuma alteração foi feita no edital.', 402);
-    if (status === 429) return fail('O serviço de IA está temporariamente limitado. Aguarde e tente novamente.', 429);
-    return fail('O serviço de IA não conseguiu analisar este edital (código ' + status + ').', 502);
+  if (!geminiResponse.ok) {
+    const status = geminiResponse.status;
+    if (status === 400) return fail('O Gemini não aceitou o formato do pedido. Revise o PDF ou tente novamente.', 422);
+    if (status === 401 || status === 403) return fail('A chave gratuita do Gemini não foi aceita. Verifique a configuração no servidor.', 502);
+    if (status === 429) return fail('O limite gratuito do Gemini foi atingido ou está temporariamente indisponível. Aguarde a renovação da cota e tente novamente. Nenhuma cobrança será feita automaticamente por esta integração.', 429);
+    if (status === 503) return fail('O Gemini está temporariamente sobrecarregado. Tente novamente mais tarde.', 503);
+    return fail('O Gemini não conseguiu analisar este edital (código ' + status + ').', 502);
   }
 
   try {
-    const response = await gatewayResponse.json();
-    const content = response?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') throw new Error('Resposta vazia da IA.');
+    const response = await geminiResponse.json();
+    const content = response?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text || '')
+      .join('');
+    if (typeof content !== 'string' || !content.trim()) throw new Error('Resposta vazia da IA.');
     const parsed = extractJson(content);
     if (!Array.isArray(parsed.positions) || !Array.isArray(parsed.subjects)) throw new Error('Estrutura da análise incompleta.');
     const positions: AiPosition[] = parsed.positions.filter((item: any) =>
