@@ -70,7 +70,7 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
   remainingChars-=pageText.length;
  }
  const text=chunks.join('\n\n');
- return {pageCount:pages.length,selectedCount:selectedPages.length,text,pages:selectedPages.map(index=>pages[index])};
+ return {pageCount:pages.length,selectedCount:selectedPages.length,text,pages:selectedPages.map(index=>'[PÁGINA '+(index+1)+']\n'+pages[index])};
 }
 
 
@@ -82,7 +82,7 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
   'Extração realizada localmente, sem depender de um serviço de IA. Confira os trechos e páginas indicados antes de montar o cronograma.',
   'A identificação automática de cargos e tópicos usa regras estruturais; tabelas complexas, anexos separados ou PDFs escaneados podem exigir conferência manual.'
  ];
- const all=pages.map((text,index)=>({text,normalized:normalizeText(text),page:index+1}));
+ const all=pages.map((raw,index)=>{const match=raw.match(/^\[PÁGINA\s+(\d+)\]\s*/i);const text=match?raw.slice(match[0].length):raw;return {text,normalized:normalizeText(text),page:match?Number(match[1]):index+1};});
  const full=all.map(p=>'[PÁGINA '+p.page+']\n'+p.text).join('\n');
  const normFull=normalizeText(full);
  const docType=/demanda por vaga|candidato por vaga|relacao de candidatos|resultado final|classificacao final|gabarito definitivo/.test(normFull)?'demanda':
