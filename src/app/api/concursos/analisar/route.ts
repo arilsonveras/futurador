@@ -86,7 +86,7 @@ export async function POST(req:Request){
   }
   parts.push({text:`Você é especialista em leitura de editais de concursos públicos brasileiros. Faça uma extração minuciosa, priorizando o edital mais recente e suas retificações. Não use conhecimento externo nem invente dados.
 Responda exclusivamente JSON válido neste formato:
-{"examName":string|null,"institution":string|null,"organizer":string|null,"examDate":"YYYY-MM-DD"|null,"positions":[{"name":string,"category":string|null,"formation":string|null,"educationLevel":string|null,"vacancies":number|null,"immediateVacancies":number|null,"reserveList":boolean|null,"vacancyBreakdown":{"general":number|null,"disability":number|null,"black":number|null,"indigenous":number|null,"quilombola":number|null},"evidence":string}],"subjects":[{"name":string,"positionNames":string[],"module":"basic"|"specific","topics":[string],"evidence":string}],"officialSource":boolean,"warnings":string[]}.
+{"examName":string|null,"institution":string|null,"organizer":string|null,"examDate":"YYYY-MM-DD"|null,"positions":[{"name":string,"category":string|null,"formation":string|null,"educationLevel":string|null,"vacancies":number|null,"immediateVacancies":number|null,"reserveList":boolean|null,"vacancyBreakdown":{"general":number|null,"disability":number|null,"black":number|null,"indigenous":number|null,"quilombola":number|null},"evidence":string}],"subjects":[{"name":string,"positionNames":string[],"scope":"common"|"specific","module":"basic"|"specific","topics":[string],"evidence":string}],"officialSource":boolean,"warnings":string[]}.
 REGRAS OBRIGATÓRIAS:
 1) CARGOS: não pare em categorias genéricas como "Professor" ou "Especialista em Educação". Extraia cada opção específica de inscrição/formação exatamente como aparece no quadro de vagas: por exemplo "Professor Classe I - Matemática", "Professor Classe I - Língua Portuguesa", etc. Cada especialidade/formação deve ser uma opção separada em positions. Inclua também os cargos administrativos específicos.
 2) VAGAS: para cada opção específica, extraia o total de vagas do quadro de vagas e, se possível, vagas imediatas, cadastro de reserva e distribuição por cotas. Não confunda quantidade de inscritos/demanda com número de vagas. Se o documento não informar, use null.
@@ -120,7 +120,7 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   }));
   const subjects=data.subjects.filter((x:any)=>x&&typeof x.name==='string'&&Array.isArray(x.topics)).slice(0,200).map((x:any)=>({
    name:x.name,positionNames:Array.isArray(x.positionNames)?x.positionNames.filter((n:any)=>typeof n==='string'):[],
-   module:x.module==='specific'?'specific':'basic',topics:x.topics.filter((t:any)=>typeof t==='string').slice(0,300),
+   scope:x.scope==='specific'?'specific':'common',module:x.module==='specific'?'specific':'basic',topics:x.topics.filter((t:any)=>typeof t==='string').slice(0,300),
    evidence:typeof x.evidence==='string'?x.evidence:''
   }));
   const warnings=Array.isArray(data.warnings)?data.warnings.filter((x:any)=>typeof x==='string').slice(0,20):[];
