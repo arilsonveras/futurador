@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 type Availability = { weekday: number; start_time: string; end_time: string };
-type Topic = { id: string; title: string; subjectName: string };
+type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string };
+type Position = { id: string; name: string; code: string | null; sort_order: number };
 type Props = {
   examId: string;
   examTitle: string;
   examDate: string | null;
   topics: Topic[];
+  positions: Position[];
   initialAvailability: Availability[];
   existingPlanId: string | null;
 };
@@ -24,7 +26,7 @@ function dateKey(date: Date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
 }
 
-export default function PlannerSetup({ examId, examTitle, examDate, topics, initialAvailability, existingPlanId }: Props) {
+export default function PlannerSetup({ examId, examTitle, examDate, topics, positions, initialAvailability, existingPlanId }: Props) {
   const [availability, setAvailability] = useState<Record<number, { enabled: boolean; start: string; end: string }>>(() => {
     const result: Record<number, { enabled: boolean; start: string; end: string }> = {};
     for (let day = 0; day < 7; day++) {
@@ -33,6 +35,9 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
     }
     return result;
   });
+  const [selectedPositionId, setSelectedPositionId] = useState(positions[0]?.id || '');
+  const selectedPosition = positions.find(position => position.id === selectedPositionId);
+  const selectedTopics = useMemo(() => topics.filter(topic => topic.scopeType === 'common' || (topic.scopeType === 'specific' && topic.positionId === selectedPositionId)), [topics, selectedPositionId]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [planId, setPlanId] = useState(existingPlanId);
@@ -45,7 +50,11 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
 
   async function saveAndGenerate() {
     setMessage('');
-    if (!topics.length) {
+    if (!positions.length || !selectedPositionId) {
+      setMessage('Este edital ainda não possui cargos identificados. Volte à análise e confira a estrutura do edital.');
+      return;
+    }
+    if (!selectedTopics.length) {
       setMessage('Este edital ainda não tem tópicos cadastrados. Volte à análise e confira se as disciplinas foram salvas.');
       return;
     }
@@ -100,7 +109,8 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
     const { data: plan, error: planError } = await supabase.from('study_plans').insert({
       user_id: user.id,
       exam_id: examId,
-      title: 'Cronograma — ' + examTitle,
+      position_id: selectedPositionId,
+      title: 'Cronograma — ' + examTitle + ' — ' + (selectedPosition?.name || 'Cargo'),
       starts_on: startDate,
       ends_on: endDate,
       mode: 'hybrid',
@@ -121,7 +131,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
       let cursor = minutes(available.start);
       const finish = minutes(available.end);
       while (cursor + duration <= finish && tasks.length < 500) {
-        const topic = topics[topicIndex % topics.length];
+        const topic = selectedTopics[topicIndex % selectedTopics.length];
         const hour = String(Math.floor(cursor / 60)).padStart(2, '0');
         const minute = String(cursor % 60).padStart(2, '0');
         tasks.push({
@@ -164,7 +174,8 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
       <section className="panel">
         <h1>Montar seu cronograma</h1>
         <p className="muted">{examTitle}</p>
-        <p>Encontramos <strong>{topics.length} tópicos</strong> para distribuir. Informe os dias e horários em que você consegue estudar.</p>
+        {positions.length > 0 ? <div className="field"><label htmlFor="position">Qual cargo/área você vai prestar?</label><select id="position" value={selectedPositionId} onChange={e => setSelectedPositionId(e.target.value)}>{positions.map(position => <option key={position.id} value={position.id}>{position.code ? position.code + ' — ' : ''}{position.name}</option>)}</select></div> : <p className="message error">Não encontramos cargos vinculados a este edital. Volte à análise antes de montar o cronograma.</p>}
+        <p>Encontramos <strong>{selectedTopics.length} tópicos</strong> para este cargo, incluindo conteúdos comuns e específicos. Informe os dias e horários em que você consegue estudar.</p>
         {examDate ? <p className="muted">Data da prova: {new Date(examDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p> : <p className="muted">Sem data de prova cadastrada: o primeiro cronograma será de 8 semanas.</p>}
         <div className="field">
           <label htmlFor="duration">Duração de cada sessão</label>
@@ -187,7 +198,7 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, init
         </div>
         <p className="muted">{activeDays} dia(s) selecionado(s).</p>
         {message && <p className={message.startsWith('Cronograma criado') ? 'message' : 'message error'}>{message}</p>}
-        {planId ? <p><Link className="btn" href={'/cronograma/' + planId}>Abrir meu cronograma</Link></p> : <button className="btn" type="button" onClick={saveAndGenerate} disabled={busy}>{busy ? 'Montando cronograma...' : 'Salvar horários e gerar cronograma'}</button>}
+        {planId ? <p><Link className="btn" href={'/cronograma/' + planId}>Abrir meu cronograma</Link></p> : <button className="btn" type="button" onClick={saveAndGenerate} disabled={busy || !positions.length || !selectedTopics.length}>{busy ? 'Montando cronograma...' : 'Salvar horários e gerar cronograma'}</button>}
       </section>
     </main>
   );
