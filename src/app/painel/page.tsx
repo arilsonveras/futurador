@@ -1,1 +1,52 @@
-import {redirect} from 'next/navigation';import Link from 'next/link';import {createClient} from '@/lib/supabase/server';import ExamList from './ExamList';export const dynamic='force-dynamic';export default async function Painel(){const supabase=await createClient();const{data:{user}}=await supabase.auth.getUser();if(!user)redirect('/login');const{data:exams,error:examError}=await supabase.from('exams').select('id,title,institution,exam_date,status,edital_file_path').order('created_at',{ascending:false});const{data:tasks}=await supabase.from('study_tasks').select('id,title,status,scheduled_for').order('scheduled_for',{ascending:true}).limit(5);return <main className="wrap"><nav className="nav"><Link className="brand" href="/">futurador.</Link><form action="/auth/logout" method="post"><button className="btn alt">Sair</button></form></nav><h1>Seu painel de estudos</h1><p className="muted">Bem-vindo(a), {user.user_metadata?.full_name||user.email}. Aqui começa sua organização.</p><section className="grid" style={{margin:'24px 0'}}><article className="panel"><span className="muted">Editais cadastrados</span><div className="stat">{exams?.length||0}</div></article><article className="panel"><span className="muted">Tarefas encontradas</span><div className="stat">{tasks?.length||0}</div></article><article className="panel"><span className="muted">Próxima etapa</span><h3>Montar seu plano</h3><p className="muted">Primeiro, cadastre e analise o edital do concurso.</p></article></sect¶»§q«^
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import ExamList from './ExamList';
+
+export const dynamic = 'force-dynamic';
+
+export default async function Painel() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { data: exams } = await supabase
+    .from('exams')
+    .select('id,title,institution,exam_date,status,edital_file_path')
+    .order('created_at', { ascending: false });
+
+  const { data: tasks } = await supabase
+    .from('study_tasks')
+    .select('id,title,status,scheduled_for')
+    .order('scheduled_for', { ascending: true })
+    .limit(5);
+
+  return (
+    <main className="wrap">
+      <nav className="nav">
+        <Link className="brand" href="/">futurador.</Link>
+        <form action="/auth/logout" method="post">
+          <button className="btn alt" type="submit">Sair</button>
+        </form>
+      </nav>
+      <h1>Seu painel de estudos</h1>
+      <p className="muted">Bem-vindo(a), {user.user_metadata?.full_name || user.email}. Aqui começa sua organização.</p>
+      <section className="grid stats-grid">
+        <article className="panel">
+          <span className="muted">Editais cadastrados</span>
+          <div className="stat">{exams?.length || 0}</div>
+        </article>
+        <article className="panel">
+          <span className="muted">Tarefas encontradas</span>
+          <div className="stat">{tasks?.length || 0}</div>
+        </article>
+        <article className="panel">
+          <span className="muted">Próxima etapa</span>
+          <h3>Montar seu plano</h3>
+          <p className="muted">Primeiro, cadastre e analise o edital do concurso.</p>
+        </article>
+      </section>
+      <ExamList initialExams={exams || []} />
+    </main>
+  );
+}
