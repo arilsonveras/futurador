@@ -46,8 +46,9 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
    for(let j=Math.max(0,i-2);j<=Math.min(pages.length-1,i+2);j++)selected.add(j);
   }
  }
- let syllabusStart=normalized.findIndex((value,index)=>index>=12&&/conteudo programatico|programa das provas/.test(value)&&(/anexo|conhecimentos|disciplina/.test(value)));
- if(syllabusStart<0)syllabusStart=normalized.findIndex((value,index)=>index>=20&&/conteudo programatico|programa das provas/.test(value));
+ // Ignora sumários curtos: o início real do anexo programático costuma ter texto mais extenso.
+ let syllabusStart=normalized.findIndex((value,index)=>index>=20&&value.length>700&&/conteudo programatico|programa das provas/.test(value)&&(/anexo|conhecimentos|disciplina|topicos/.test(value)));
+ if(syllabusStart<0)syllabusStart=normalized.findIndex((value,index)=>index>=25&&value.length>900&&/lingua portuguesa|conhecimentos especificos|conhecimentos gerais/.test(value));
  if(syllabusStart>=0){
   // O conteúdo programático costuma ficar nos anexos finais; preserva todas as páginas a partir do início identificado.
   for(let i=Math.max(0,syllabusStart-1);i<pages.length;i++)selected.add(i);
@@ -57,12 +58,12 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
   }
  }
  let selectedPages=[...selected].sort((a,b)=>a-b);
- if(selectedPages.length>70)selectedPages=selectedPages.slice(0,70);
- let remainingChars=220000;
+ if(selectedPages.length>60)selectedPages=selectedPages.slice(0,60);
+ let remainingChars=135000;
  const chunks:string[]=[];
  for(const index of selectedPages){
   if(remainingChars<=0)break;
-  const pageText=pages[index].slice(0,Math.min(6500,remainingChars));
+  const pageText=pages[index].slice(0,Math.min(4000,remainingChars));
   chunks.push('[PÁGINA '+(index+1)+' de '+pages.length+']\n'+pageText);
   remainingChars-=pageText.length;
  }
@@ -164,30 +165,45 @@ URL inicial: ${initialUrl.toString()}
 Documento efetivamente analisado: ${evidenceUrl}`});
   const requestBody=JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.05,maxOutputTokens:16000,responseMimeType:'application/json'}});
   let response:Response|null=null;
-  let usedModel='gemini-3.5-flash-lite';
+  let usedModel='gemini-3.6-flash';
   let providerMessage='';
-  // Mantém o modelo gratuito mais econômico como principal. Se o Google devolver 5xx,
-  // tenta outros modelos Gemini com faixa gratuita documentada, sem habilitar billing.
-  // Não habilita billing nem muda a configuração de cobrança do projeto.
+  // O Google vinha devolvendo 503 UNAVAILABLE em sequência. Reduzimos o contexto
+  // do PDF e priorizamos modelos alternativos, com uma repetição curta em caso de sobrecarga.
+  // Todos permanecem no fluxo gratuito; nenhuma configuração de cobrança é alterada.
   const modelFallbacks=[
-   {name:'gemini-3.5-flash-lite',timeout:48000},
-   {name:'gemini-3.8-flash',timeout:10000},
-   {name:'gemini-3.6-flash',timeout:10000},
-   {name:'gemini-3.1-flash-lite',timeout:10000}
+   {name:'gemini-3.6-flash',timeout:62000},
+   {name:'gemini-3.1-flash-lite',timeout:25000},
+   {name:'gemini-3.5-flash-lite',timeout:18000},
+   {name:'gemini-3.8-flash',timeout:12000}
   ];
   const modelStartedAt=Date.now();
   for(let modelIndex=0;modelIndex<modelFallbacks.length;modelIndex++){
    const model=modelFallbacks[modelIndex];
-   const remaining=78000-(Date.now()-modelStartedAt);
-   if(remaining<7000)break;
+   const remaining=108000-(Date.now()-modelStartedAt);
+   if(remaining<6500)break;
    const timeout=Math.max(5000,Math.min(model.timeout,remaining-2500));
    const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
-   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(timeout)});
-   if(response.ok){usedModel=model.name;break;}
-   const details=await response.clone().json().catch(()=>null);
-   providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
-   console.error('[Futurador][Gemini] Falha do provedor',JSON.stringify({model:model.name,httpStatus:response.status,providerStatus:details?.error?.status||null,message:providerMessage.slice(0,700)}));
-   if(response.status===429||response.status<500||![500,502,503,504].includes(response.status))break;
+   for(let attempt=0;attempt<2;attempt++){
+    try{
+     response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(timeout)});
+    }catch(error){
+     const message=error instanceof Error?error.message:'';
+     if(error instanceof Error&&(error.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
+      console.error('[Futurador][Gemini] Tempo esgotado',JSON.stringify({model:model.name,timeoutMs:timeout,attempt:attempt+1}));
+      response=null;
+      break;
+     }
+     throw error;
+    }
+    if(response.ok){usedModel=model.name;break;}
+    const details=await response.clone().json().catch(()=>null);
+    providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
+    console.error('[Futurador][Gemini] Falha do provedor',JSON.stringify({model:model.name,httpStatus:response.status,providerStatus:details?.error?.status||null,attempt:attempt+1,message:providerMessage.slice(0,500)}));
+    if(response.status===429||response.status<500||![500,502,503,504].includes(response.status))break;
+    if(attempt===0&&Date.now()-modelStartedAt<95000)await new Promise(resolve=>setTimeout(resolve,1200));
+   }
+   if(response?.ok)break;
+   if(response?.status===429||response?.status===400||response?.status===401||response?.status===403)break;
   }
   if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
