@@ -7,15 +7,17 @@ type Mode = 'search' | 'analyze' | 'save' | 'plan' | 'generic';
 const messages: Record<Mode, string[]> = {
   search: [
     'Consultando páginas de bancas organizadoras e órgãos públicos...',
-    'Ampliando a busca para encontrar outras fontes do concurso...',
+    'Pesquisando também por nomes completos e abreviações do concurso...',
+    'Ampliando a busca para encontrar outras fontes relacionadas...',
     'Conferindo nomes, datas e links dos resultados encontrados...',
-    'Organizando os resultados para você escolher a fonte correta...',
+    'Organizando todos os resultados para você escolher...',
   ],
   analyze: [
     'Acessando o documento e verificando se é um edital oficial...',
+    'Lendo o PDF e separando as páginas mais importantes...',
     'Conferindo se há retificações que alteram o edital...',
-    'Identificando os cargos e as especialidades disponíveis...',
-    'Localizando as disciplinas previstas para o cargo...',
+    'Identificando os cargos, especialidades e vagas disponíveis...',
+    'Localizando as disciplinas previstas para cada cargo...',
     'Separando os tópicos do conteúdo programático...',
     'Conferindo a data da prova e as informações do cronograma...',
     'Organizando os dados para apresentar uma análise confiável...',
@@ -48,23 +50,44 @@ export default function FullScreenLoader({
   mode?: Mode;
 }) {
   const [step, setStep] = useState(0);
+  const [progress, setProgress] = useState(6);
   const steps = messages[mode];
+
   useEffect(() => {
     setStep(0);
-    const timer = window.setInterval(() => {
+    setProgress(6);
+    const messageTimer = window.setInterval(() => {
       setStep((current) => (current + 1) % steps.length);
     }, 2400);
-    return () => window.clearInterval(timer);
+    const progressTimer = window.setInterval(() => {
+      setProgress((current) => {
+        if (current >= 95) return 95;
+        const increment = current < 55 ? 1.8 : current < 78 ? 0.8 : 0.25;
+        return Math.min(95, current + increment);
+      });
+    }, 500);
+    return () => {
+      window.clearInterval(messageTimer);
+      window.clearInterval(progressTimer);
+    };
   }, [mode, steps.length]);
 
   const currentMessage = message || steps[step];
+  const displayedProgress = Math.round(progress);
   return (
     <div className="fullscreen-loader" role="status" aria-live="polite" aria-label={currentMessage}>
       <div className="fullscreen-loader-card">
         <div className="loader-orbit"><span /><span /><span /></div>
         <strong>Futurador</strong>
         <p key={currentMessage} className="loader-message">{currentMessage}</p>
-        <small>Estamos trabalhando nisso. Não feche esta página.</small>
+        <div className="loader-progress-heading">
+          <span>Progresso estimado</span>
+          <strong>{displayedProgress}%</strong>
+        </div>
+        <div className="loader-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayedProgress}>
+          <span style={{ width: displayedProgress + '%' }} />
+        </div>
+        <small>O percentual é uma estimativa visual. Estamos trabalhando nisso; não feche esta página.</small>
       </div>
     </div>
   );
