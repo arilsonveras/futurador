@@ -106,23 +106,37 @@ REGRAS OBRIGATÓRIAS:
 7) Não confunda "Professor" (grupo) com cada formação específica.
 URL inicial: ${initialUrl.toString()}
 Documento efetivamente analisado: ${evidenceUrl}`});
-  const endpoint='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
   const requestBody=JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.05,maxOutputTokens:16000,responseMimeType:'application/json'}});
   let response:Response|null=null;
-  // Erros 5xx do provedor podem ser transitórios. Usa espera progressiva e respeita Retry-After,
-  // sem trocar de modelo, habilitar cobrança ou repetir erros de limite/autenticação.
-  for(let attempt=0;attempt<3;attempt++){
-   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(110000)});
-   if(response.ok||![500,502,503,504].includes(response.status)||attempt===2)break;
-   const retryAfter=response.headers.get('retry-after');
-   const retryAfterMs=retryAfter&&Number.isFinite(Number(retryAfter))?Math.min(8000,Math.max(0,Number(retryAfter)*1000)):0;
-   const backoffMs=[2500,6000][attempt];
-   await new Promise(resolve=>setTimeout(resolve,Math.max(backoffMs,retryAfterMs)));
+  let usedModel='gemini-3.5-flash-lite';
+  let providerMessage='';
+  // Mantém o modelo gratuito mais econômico como principal. Se o Google devolver 5xx,
+  // tenta uma vez o Gemini 3.8 Flash, que também possui faixa gratuita documentada.
+  // Não habilita billing nem muda a configuração de cobrança do projeto.
+  const modelFallbacks=[{name:'gemini-3.5-flash-lite',attempts:2},{name:'gemini-3.8-flash',attempts:1}];
+  for(let modelIndex=0;modelIndex<modelFallbacks.length;modelIndex++){
+   const model=modelFallbacks[modelIndex];
+   for(let attempt=0;attempt<model.attempts;attempt++){
+    const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
+    response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(90000)});
+    if(response.ok){usedModel=model.name;break;}
+    const details=await response.clone().json().catch(()=>null);
+    providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
+    console.error('[Futurador][Gemini] Falha do provedor',JSON.stringify({model:model.name,httpStatus:response.status,providerStatus:details?.error?.status||null,message:providerMessage.slice(0,700)}));
+    if(response.status===429||response.status<500||![500,502,503,504].includes(response.status))break;
+    if(attempt<model.attempts-1){
+     const retryAfter=response.headers.get('retry-after');
+     const retryAfterMs=retryAfter&&Number.isFinite(Number(retryAfter))?Math.min(6000,Math.max(0,Number(retryAfter)*1000)):0;
+     await new Promise(resolve=>setTimeout(resolve,Math.max(3000,retryAfterMs)));
+    }
+   }
+   if(response?.ok||response?.status===429||(response&&response.status<500)||!response||![500,502,503,504].includes(response.status))break;
+   if(modelIndex===0)await new Promise(resolve=>setTimeout(resolve,2500));
   }
   if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
-   if(response.status===429)return NextResponse.json({error:'O limite gratuito de uso da IA foi atingido. Aguarde a renovação da cota e tente novamente. Nenhuma cobrança será ativada.'},{status:429});
-   if(response.status===503)return NextResponse.json({error:'O serviço Gemini está temporariamente indisponível ou sobrecarregado. O Futurador tentou novamente automaticamente, mas o provedor não respondeu. Aguarde alguns minutos e tente outra vez; nenhuma cobrança foi ativada.'},{status:503});
+   if(response.status===429)return NextResponse.json({error:'O limite gratuito de uso da IA foi atingido ou a cota do projeto está indisponível. Confira o painel de uso do Google AI Studio. Nenhuma cobrança será ativada.'},{status:429});
+   if(response.status===503)return NextResponse.json({error:'O Google está temporariamente sem capacidade para atender a análise, inclusive após a tentativa em um segundo modelo gratuito. Aguarde alguns minutos e tente novamente. Nenhuma cobrança foi ativada.'},{status:503});
    if(response.status>=500)return NextResponse.json({error:'O serviço de IA apresentou uma falha temporária (HTTP '+response.status+'). Tente novamente em alguns minutos.'},{status:503});
    return NextResponse.json({error:'O serviço de IA recusou a solicitação (HTTP '+response.status+'). Verifique a configuração da chave no painel do projeto.'},{status:502});
   }
@@ -150,7 +164,7 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   if(rejectedDocument)warnings.unshift(documentType==='demanda'?'O arquivo selecionado é uma relação de candidatos por vaga/demanda, não o edital de abertura. O Futurador descartou os cargos e números desse documento. Volte à pesquisa e selecione o edital oficial de abertura ou a página oficial da banca.':'O arquivo selecionado não foi identificado com segurança como edital de abertura ou retificação oficial. Nenhum cargo, disciplina ou data foi aproveitado.');
   if(sourceType!=='pdf')warnings.unshift('A fonte analisada foi uma página HTML; o edital em PDF não foi localizado automaticamente. Confira o conteúdo antes de gerar o cronograma.');
   if(!subjects.length||subjects.every((s:any)=>!s.topics.length))warnings.push('Nenhum tópico programático foi extraído. O Futurador deve impedir a geração de um cronograma baseado em conteúdo vazio.');
-  return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,documentType,isOfficialNotice,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
+  return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,documentType,isOfficialNotice,aiModel:usedModel,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
  }catch(e){
   const message=e instanceof Error?e.message:'';
   if(e instanceof Error&&(e.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
