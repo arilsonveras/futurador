@@ -18,7 +18,7 @@ export type ParsedPosition = {
 export type ParsedEdital = { positions: ParsedPosition[]; subjects: ParsedSubject[]; warnings: string[] };
 
 function normalize(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/GOVERNAMENT\s+AL/g, 'GOVERNAMENTAL').replace(/ADMINISTRACA\s+O/g, 'ADMINISTRACAO').replace(/\s+/g, ' ').trim();
 }
 function clean(value: string) { return value.replace(/\s+/g, ' ').replace(/^[-•▪◦]+\s*/, '').trim(); }
 function escapeRegex(value: string) { return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'); }
