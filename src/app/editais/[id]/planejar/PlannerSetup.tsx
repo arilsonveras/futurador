@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 type Availability = { weekday: number; start_time: string; end_time: string };
-type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string; positionIds: string[] };
+type Topic = { id: string; title: string; subjectName: string; positionId: string | null; scopeType: string; positionIds: string[]; questionCount: number | null };
 type Position = { id: string; name: string; code: string | null; sort_order: number };
 type Knowledge = 'nao_estudei' | 'dificuldade' | 'regular' | 'domino';
 type Props = {
@@ -51,7 +51,8 @@ export default function PlannerSetup({ examId, examTitle, examDate, topics, posi
     const weights: Record<Knowledge, number> = { nao_estudei: 3, dificuldade: 3, regular: 2, domino: 1 };
     return subjectNames.flatMap(name => {
       const subjectTopics = selectedTopics.filter(topic => topic.subjectName === name);
-      return Array.from({ length: weights[knowledge[name] || 'regular'] }, () => subjectTopics).flat();
+      const questionFactor = Math.max(1, Math.round((subjectTopics[0]?.questionCount || 10) / 5));
+      return Array.from({ length: weights[knowledge[name] || 'regular'] * questionFactor }, () => subjectTopics).flat();
     });
   }, [selectedTopics, subjectNames, knowledge]);
 
