@@ -133,13 +133,13 @@ export async function POST(req: Request) {
           source: 'qconcursos.com',
         },
         {
-          title: 'Concurso SEDUC-PA: edital e informações | Aprova Concursos',
+          title: 'Concurso SEDUC-PA 2026: edital e informações | Aprova Concursos',
           url: 'https://www.aprovaconcursos.com.br/noticias/concurso-seduc-pa/',
           snippet: 'Notícia especializada sobre o concurso da Secretaria de Educação do Pará, com referência ao edital e às 2.000 vagas.',
           source: 'aprovaconcursos.com.br',
         },
         {
-          title: 'Governo do Pará publica edital de concurso da Seduc | Agência Pará',
+          title: 'Governo do Pará publica edital de concurso da Seduc 2026 | Agência Pará',
           url: 'https://www.agenciapara.com.br/noticia/79372/governo-do-para-publica-nesta-segunda-feira-31-edital-de-concurso-da-seduc-com-2-mil-vagas-abertas',
           snippet: 'Notícia do Governo do Pará sobre a publicação do edital da SEDUC, com informações sobre vagas e etapas.',
           source: 'agenciapara.com.br',
