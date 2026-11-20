@@ -34,6 +34,7 @@ export default function TaskList({ initialTasks, planTitle }: { initialTasks: Ta
 
   return (
     <main className="wrap">
+      {busy && <FullScreenLoader mode="plan" />}
       <nav className="nav"><Link className="brand" href="/">futurador.</Link><Link href="/painel">Voltar ao painel</Link></nav>
       <section className="panel">
         <h1>{planTitle}</h1>
