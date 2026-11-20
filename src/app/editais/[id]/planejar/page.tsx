@@ -16,7 +16,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
   if (error || !exam) notFound();
 
   const { data: subjects } = await supabase.from('subjects')
-    .select('id,name,sort_order,position_id,scope_type').eq('exam_id', id).order('sort_order');
+    .select('id,name,sort_order,position_id,scope_type,question_count').eq('exam_id', id).order('sort_order');
   const { data: positions } = await supabase.from('exam_positions').select('id,name,code,sort_order').eq('exam_id', id).order('sort_order');
   const subjectIds = (subjects || []).map(subject => subject.id);
   const { data: subjectPositionRows } = subjectIds.length
