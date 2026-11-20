@@ -24,3 +24,9 @@
 .results-heading{padding:18px 20px;background:#fff;border:1px solid #dfe8d4;border-radius:14px;margin-bottom:16px}
 .source-card{scroll-margin-top:20px}
 @media(prefers-reduced-motion:reduce){.loader-orbit{animation-duration:2.5s}.fullscreen-loader-card{transition:none}}
+
+.loader-progress-heading{width:100%;display:flex;align-items:center;justify-content:space-between;margin:18px 0 7px;color:#647568;font-size:11px;font-weight:700}
+.loader-progress-heading strong{font-size:18px;letter-spacing:-.5px;color:#174b3a;font-variant-numeric:tabular-nums}
+.loader-progress-track{width:100%;height:9px;overflow:hidden;border-radius:999px;background:#e8eee3;box-shadow:inset 0 1px 2px rgba(20,50,32,.08)}
+.loader-progress-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#709342,#b4d56a);transition:width .45s ease}
+.fullscreen-loader-card>small{margin-top:12px}
