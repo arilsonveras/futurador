@@ -24,7 +24,43 @@ function safeUrl(value:string){
   return u;
  }catch{return null;}
 }
-async function getSource(url:URL){
+
+async function extractRelevantPdfText(buffer:ArrayBuffer){
+ const pdfjsModule:any=await import('pdfjs-dist/legacy/build/pdf.js');
+ const pdfjs:any=pdfjsModule.default||pdfjsModule;
+ const task=pdfjs.getDocument({data:new Uint8Array(buffer),disableFontFace:true,useSystemFonts:true,isEvalSupported:false});
+ const document=await task.promise;
+ const pages:string[]=[];
+ for(let pageNumber=1;pageNumber<=document.numPages;pageNumber++){
+  const page=await document.getPage(pageNumber);
+  const content=await page.getTextContent();
+  const text=content.items.map((item:any)=>typeof item.str==='string'?item.str:'').filter(Boolean).join(' ').replace(/\\s+/g,' ').trim();
+  pages.push(text);
+ }
+ const normalized=pages.map(value=>value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase());
+ const selected=new Set<number>();
+ for(let i=0;i<Math.min(12,pages.length);i++)selected.add(i);
+ for(let i=0;i<normalized.length;i++){
+  if(/quadro.{0,45}vagas|distribuicao.{0,35}vagas|cargos.{0,35}vagas|vagas.{0,35}cargos/.test(normalized[i])){
+   for(let j=Math.max(0,i-2);j<=Math.min(pages.length-1,i+2);j++)selected.add(j);
+  }
+ }
+ let syllabusStart=normalized.findIndex((value,index)=>index>=12&&/conteudo programatico|programa das provas/.test(value)&&(/anexo|conhecimentos|disciplina/.test(value)));
+ if(syllabusStart<0)syllabusStart=normalized.findIndex((value,index)=>index>=20&&/conteudo programatico|programa das provas/.test(value));
+ if(syllabusStart>=0){
+  // O conteúdo programático costuma ficar nos anexos finais; preserva todas as páginas a partir do início identificado.
+  for(let i=Math.max(0,syllabusStart-1);i<pages.length;i++)selected.add(i);
+ }else{
+  for(let i=0;i<normalized.length;i++){
+   if(/conhecimentos gerais|conhecimentos especificos|lingua portuguesa|conhecimentos basicos/.test(normalized[i]))selected.add(i);
+  }
+ }
+ let selectedPages=[...selected].sort((a,b)=>a-b);
+ if(selectedPages.length>90)selectedPages=selectedPages.slice(0,90);
+ const text=selectedPages.map(index=>'[PÁGINA '+(index+1)+' de '+pages.length+']\\n'+pages[index].slice(0,9000)).join('\\n\\n');
+ return {pageCount:pages.length,selectedCount:selectedPages.length,text};
+}
+\nasync function getSource(url:URL){
  const response=await fetch(url.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(15000),cache:'no-store'});
  if(response.status>=300&&response.status<400){
   const location=response.headers.get('location');
@@ -57,7 +93,17 @@ export async function POST(req:Request){
 
   if(type.includes('pdf')||sourceUrl.pathname.toLowerCase().endsWith('.pdf')){
    sourceType='pdf';
-   parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+   try{
+    const extracted=await extractRelevantPdfText(buffer);
+    if(extracted.text.length>=2500){
+     parts=[{text:'TEXTO EXTRAÍDO DO EDITAL EM PDF. O documento possui '+extracted.pageCount+' páginas; foram selecionadas '+extracted.selectedCount+' páginas iniciais e relevantes para cargos, vagas, cronograma e conteúdo programático. Preserve os números de página entre colchetes nas evidências.\\n\\n'+extracted.text}];
+    }else{
+     parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+    }
+   }catch(error){
+    console.error('[Futurador][PDF] Falha na extração local; usando PDF original',error instanceof Error?error.message:'erro desconhecido');
+    parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+   }
   }else{
    const html=new TextDecoder().decode(buffer);
    const pageText=htmlText(html).slice(0,35000);
@@ -113,25 +159,25 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   // Mantém o modelo gratuito mais econômico como principal. Se o Google devolver 5xx,
   // tenta outros modelos Gemini com faixa gratuita documentada, sem habilitar billing.
   // Não habilita billing nem muda a configuração de cobrança do projeto.
-  const modelFallbacks=[{name:'gemini-3.5-flash-lite',attempts:2},{name:'gemini-3.8-flash',attempts:1},{name:'gemini-3.6-flash',attempts:1},{name:'gemini-3.1-flash-lite',attempts:1}];
+  const modelFallbacks=[
+   {name:'gemini-3.5-flash-lite',timeout:65000},
+   {name:'gemini-3.8-flash',timeout:15000},
+   {name:'gemini-3.6-flash',timeout:15000},
+   {name:'gemini-3.1-flash-lite',timeout:15000}
+  ];
+  const modelStartedAt=Date.now();
   for(let modelIndex=0;modelIndex<modelFallbacks.length;modelIndex++){
    const model=modelFallbacks[modelIndex];
-   for(let attempt=0;attempt<model.attempts;attempt++){
-    const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
-    response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(55000)});
-    if(response.ok){usedModel=model.name;break;}
-    const details=await response.clone().json().catch(()=>null);
-    providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
-    console.error('[Futurador][Gemini] Falha do provedor',JSON.stringify({model:model.name,httpStatus:response.status,providerStatus:details?.error?.status||null,message:providerMessage.slice(0,700)}));
-    if(response.status===429||response.status<500||![500,502,503,504].includes(response.status))break;
-    if(attempt<model.attempts-1){
-     const retryAfter=response.headers.get('retry-after');
-     const retryAfterMs=retryAfter&&Number.isFinite(Number(retryAfter))?Math.min(6000,Math.max(0,Number(retryAfter)*1000)):0;
-     await new Promise(resolve=>setTimeout(resolve,Math.max(3000,retryAfterMs)));
-    }
-   }
-   if(response?.ok||response?.status===429||(response&&response.status<500)||!response||![500,502,503,504].includes(response.status))break;
-   if(modelIndex===0)await new Promise(resolve=>setTimeout(resolve,2500));
+   const remaining=108000-(Date.now()-modelStartedAt);
+   if(remaining<7000)break;
+   const timeout=Math.max(5000,Math.min(model.timeout,remaining-2500));
+   const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
+   response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(timeout)});
+   if(response.ok){usedModel=model.name;break;}
+   const details=await response.clone().json().catch(()=>null);
+   providerMessage=typeof details?.error?.message==='string'?details.error.message:'Resposta sem descrição do provedor.';
+   console.error('[Futurador][Gemini] Falha do provedor',JSON.stringify({model:model.name,httpStatus:response.status,providerStatus:details?.error?.status||null,message:providerMessage.slice(0,700)}));
+   if(response.status===429||response.status<500||![500,502,503,504].includes(response.status))break;
   }
   if(!response)throw new Error('Não foi possível conectar ao serviço de IA.');
   if(!response.ok){
@@ -168,7 +214,7 @@ Documento efetivamente analisado: ${evidenceUrl}`});
  }catch(e){
   const message=e instanceof Error?e.message:'';
   if(e instanceof Error&&(e.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
-   return NextResponse.json({error:'A análise do edital demorou mais que o esperado. Isso pode acontecer com PDFs muito extensos. Tente novamente; nenhuma cobrança foi ativada.'},{status:504});
+   return NextResponse.json({error:'O Google demorou mais que o limite de espera para analisar este edital. O Futurador já priorizou as páginas relevantes do PDF; tente novamente em alguns minutos. Nenhuma cobrança foi ativada.'},{status:504});
   }
   return NextResponse.json({error:message||'Não foi possível analisar a fonte.'},{status:502});
  }
