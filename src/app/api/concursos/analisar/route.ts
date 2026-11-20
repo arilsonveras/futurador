@@ -26,6 +26,7 @@ function safeUrl(value:string){
 }
 
 async function extractRelevantPdfText(buffer:ArrayBuffer){
+ // @ts-ignore pdfjs-dist 3.x expõe o build legado sem declaração para este caminho interno.
  const pdfjsModule:any=await import('pdfjs-dist/legacy/build/pdf.js');
  const pdfjs:any=pdfjsModule.default||pdfjsModule;
  const task=pdfjs.getDocument({data:new Uint8Array(buffer),disableFontFace:true,useSystemFonts:true,isEvalSupported:false});
@@ -56,8 +57,16 @@ async function extractRelevantPdfText(buffer:ArrayBuffer){
   }
  }
  let selectedPages=[...selected].sort((a,b)=>a-b);
- if(selectedPages.length>90)selectedPages=selectedPages.slice(0,90);
- const text=selectedPages.map(index=>'[PÁGINA '+(index+1)+' de '+pages.length+']\n'+pages[index].slice(0,9000)).join('\n\n');
+ if(selectedPages.length>70)selectedPages=selectedPages.slice(0,70);
+ let remainingChars=220000;
+ const chunks:string[]=[];
+ for(const index of selectedPages){
+  if(remainingChars<=0)break;
+  const pageText=pages[index].slice(0,Math.min(6500,remainingChars));
+  chunks.push('[PÁGINA '+(index+1)+' de '+pages.length+']\n'+pageText);
+  remainingChars-=pageText.length;
+ }
+ const text=chunks.join('\n\n');
  return {pageCount:pages.length,selectedCount:selectedPages.length,text};
 }
 
@@ -161,15 +170,15 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   // tenta outros modelos Gemini com faixa gratuita documentada, sem habilitar billing.
   // Não habilita billing nem muda a configuração de cobrança do projeto.
   const modelFallbacks=[
-   {name:'gemini-3.5-flash-lite',timeout:65000},
-   {name:'gemini-3.8-flash',timeout:15000},
-   {name:'gemini-3.6-flash',timeout:15000},
-   {name:'gemini-3.1-flash-lite',timeout:15000}
+   {name:'gemini-3.5-flash-lite',timeout:48000},
+   {name:'gemini-3.8-flash',timeout:10000},
+   {name:'gemini-3.6-flash',timeout:10000},
+   {name:'gemini-3.1-flash-lite',timeout:10000}
   ];
   const modelStartedAt=Date.now();
   for(let modelIndex=0;modelIndex<modelFallbacks.length;modelIndex++){
    const model=modelFallbacks[modelIndex];
-   const remaining=108000-(Date.now()-modelStartedAt);
+   const remaining=78000-(Date.now()-modelStartedAt);
    if(remaining<7000)break;
    const timeout=Math.max(5000,Math.min(model.timeout,remaining-2500));
    const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+model.name+':generateContent';
