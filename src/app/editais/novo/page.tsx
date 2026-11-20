@@ -44,23 +44,24 @@ export default function NovoEdital() {
       return;
     }
 
-    const { error: insertError } = await supabase.from('exams').insert({
+    const { data: exam, error: insertError } = await supabase.from('exams').insert({
       user_id: user.id,
       title,
       institution: institution || null,
       exam_date: examDate || null,
       edital_file_path: path,
       status: 'active',
-    });
-    if (insertError) {
+    }).select('id').single();
+
+    if (insertError || !exam) {
       await supabase.storage.from('edital-pdfs').remove([path]);
-      setMessage('Não foi possível salvar o edital: ' + insertError.message);
+      setMessage('Não foi possível salvar o edital: ' + (insertError?.message || 'ID do edital não retornado'));
       setBusy(false);
       return;
     }
 
-    router.push('/painel');
-    router.refresh();
+    // Após o upload e cadastro, a análise do PDF começa automaticamente.
+    router.push(`/editais/${exam.id}/analisar`);
   }
 
   return (
@@ -89,7 +90,7 @@ export default function NovoEdital() {
           <input id="pdf" type="file" accept="application/pdf,.pdf" required onChange={e => setFile(e.target.files?.[0] || null)} />
         </div>
         {message && <p className="message error">{message}</p>}
-        <button className="btn" type="submit" disabled={busy}>{busy ? 'Enviando edital...' : 'Salvar edital'}</button>
+        <button className="btn" type="submit" disabled={busy}>{busy ? 'Enviando e preparando análise...' : 'Enviar edital e analisar automaticamente'}</button>
       </form>
     </main>
   );

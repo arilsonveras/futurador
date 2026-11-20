@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.js';
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.js';
+
+// PDF.js 3.11 precisa de um worker explícito no deploy da Vercel.
+// O CDN corresponde exatamente à versão instalada em package.json.
+GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 type Props = {
   examId: string;
@@ -60,59 +64,22 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const started = useRef(false);
 
-  async function extractPdf() {
-    setExtracting(true);
-    setMessage('');
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.storage.from('edital-pdfs').download(filePath);
-      if (error || !data) throw new Error(error?.message || 'Não foi possível baixar o PDF.');
-      const bytes = new Uint8Array(await data.arrayBuffer());
-      const pdf = await getDocument({ data: bytes, disableWorker: true, isEvalSupported: false }).promise;
-      let text = '';
-      const maxPages = Math.min(pdf.numPages, 250);
-      for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const content = await page.getTextContent();
-        const line = content.items
-          .map((item: { str?: string }) => item.str || '')
-          .filter(Boolean)
-          .join(' ');
-        text += line + '\n';
-        if (text.length >= 50000) break;
-      }
-      if (!text.trim()) {
-        setMessage('Não foi possível encontrar texto neste PDF. Se ele for digitalizado como imagem, será necessário OCR.');
-      } else {
-        setOutline(makeOutline(text.slice(0, 50000)));
-        setMessage('Texto extraído. Revise as disciplinas e os tópicos antes de salvar.');
-      }
-    } catch (error) {
-      setMessage('Falha ao ler o PDF: ' + (error instanceof Error ? error.message : 'erro desconhecido'));
-    } finally {
-      setExtracting(false);
-    }
-  }
-
-  async function saveOutline() {
-    if (alreadyHasSubjects) {
-      setMessage('Este edital já possui disciplinas cadastradas. Para preservar seu progresso, não vamos duplicá-las.');
-      return;
-    }
-    const parsed = parseOutline(outline);
+  async function persistOutline(value: string) {
+    const parsed = parseOutline(value);
     if (!parsed.length) {
-      setMessage('Não encontrei disciplinas com tópicos. Use o formato DISCIPLINA: Nome e inclua os tópicos em linhas abaixo.');
-      return;
+      setMessage('O texto foi extraído, mas não consegui separar disciplinas e tópicos com segurança. Você pode ajustar a organização abaixo e salvar.');
+      return false;
     }
+
     setBusy(true);
-    setMessage('');
     const supabase = createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      setMessage('Sua sessão expirou. Entre novamente.');
+      setMessage('Sua sessão expirou. Entre novamente para salvar a análise.');
       setBusy(false);
-      return;
+      return false;
     }
 
     for (let i = 0; i < parsed.length; i++) {
@@ -125,7 +92,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
       if (subjectError || !inserted) {
         setMessage('Erro ao salvar disciplina: ' + (subjectError?.message || 'registro não retornado'));
         setBusy(false);
-        return;
+        return false;
       }
       const topics = subject.topics.map((title, index) => ({
         user_id: user.id,
@@ -137,13 +104,78 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
       if (topicsError) {
         setMessage('A disciplina foi salva, mas houve erro ao salvar seus tópicos: ' + topicsError.message);
         setBusy(false);
-        return;
+        return false;
       }
     }
-    setMessage('Disciplinas e tópicos salvos com sucesso.');
+
+    setMessage('Análise concluída! Disciplinas e tópicos foram salvos automaticamente.');
     setBusy(false);
-    window.location.href = '/painel';
+    return true;
   }
+
+  async function extractPdf() {
+    if (alreadyHasSubjects) {
+      setMessage('Este edital já possui disciplinas cadastradas. Para preservar seu progresso, a análise automática não será repetida.');
+      return;
+    }
+    setExtracting(true);
+    setMessage('Baixando o edital e iniciando a análise automática...');
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.storage.from('edital-pdfs').download(filePath);
+      if (error || !data) throw new Error(error?.message || 'Não foi possível baixar o PDF.');
+      const bytes = new Uint8Array(await data.arrayBuffer());
+      const pdf = await getDocument({ data: bytes, isEvalSupported: false }).promise;
+      let text = '';
+      const maxPages = Math.min(pdf.numPages, 250);
+      for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const items = content.items as Array<{ str?: string; transform?: number[] }>;
+        let pageText = '';
+        let previousY: number | null = null;
+        for (const item of items) {
+          const value = item.str || '';
+          if (!value.trim()) continue;
+          const y = item.transform?.[5];
+          if (previousY !== null && typeof y === 'number' && Math.abs(y - previousY) > 2) {
+            pageText += '\n';
+          } else if (pageText && !pageText.endsWith('\n')) {
+            pageText += ' ';
+          }
+          pageText += value;
+          if (typeof y === 'number') previousY = y;
+        }
+        text += pageText + '\n';
+        if (text.length >= 50000) break;
+      }
+      if (!text.trim()) {
+        setMessage('O PDF não contém texto selecionável. Este arquivo parece digitalizado como imagem e precisa de OCR; nenhum dado foi salvo.');
+        return;
+      }
+      const generated = makeOutline(text.slice(0, 50000));
+      setOutline(generated);
+      await persistOutline(generated);
+    } catch (error) {
+      setMessage('Falha ao analisar o PDF: ' + (error instanceof Error ? error.message : 'erro desconhecido'));
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function saveManualChanges() {
+    if (alreadyHasSubjects) {
+      setMessage('Este edital já possui disciplinas cadastradas. Não vamos duplicar os dados.');
+      return;
+    }
+    await persistOutline(outline);
+  }
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void extractPdf();
+  }, []);
 
   return (
     <main className="wrap">
@@ -152,21 +184,23 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
         <Link href="/painel">Voltar ao painel</Link>
       </nav>
       <section className="panel">
-        <h1>Analisar edital</h1>
+        <h1>Análise automática do edital</h1>
         <p className="muted">{examTitle}</p>
-        {alreadyHasSubjects && <p className="message">Este edital já possui disciplinas. A análise não irá sobrescrever os dados existentes.</p>}
-        <button className="btn" type="button" onClick={extractPdf} disabled={extracting}>
-          {extracting ? 'Lendo PDF...' : 'Extrair texto do PDF'}
-        </button>
-        <p className="muted outline-help">A extração funciona em PDFs com texto selecionável. Arquivos digitalizados como imagem precisam de OCR.</p>
-        <div className="field">
-          <label htmlFor="outline">Revise e organize o conteúdo</label>
-          <textarea id="outline" value={outline} onChange={e => setOutline(e.target.value)} placeholder={'DISCIPLINA: Língua Portuguesa\n- Interpretação de textos\n- Ortografia'} />
-        </div>
+        {extracting && <p className="message">Estamos lendo o PDF e identificando disciplinas e assuntos. Aguarde nesta página.</p>}
+        {alreadyHasSubjects && <p className="message">Este edital já possui disciplinas. Os dados existentes foram preservados.</p>}
+        {outline && (
+          <div className="field">
+            <label htmlFor="outline">Conteúdo identificado (pode revisar antes de salvar novamente se a análise não foi concluída)</label>
+            <textarea id="outline" value={outline} onChange={e => setOutline(e.target.value)} />
+          </div>
+        )}
         {message && <p className="message">{message}</p>}
-        <button className="btn" type="button" onClick={saveOutline} disabled={busy || alreadyHasSubjects}>
-          {busy ? 'Salvando...' : 'Salvar disciplinas e tópicos'}
-        </button>
+        {!extracting && !alreadyHasSubjects && outline && !message.startsWith('Análise concluída') && (
+          <button className="btn" type="button" onClick={saveManualChanges} disabled={busy}>
+            {busy ? 'Salvando...' : 'Salvar disciplinas e tópicos'}
+          </button>
+        )}
+        <Link className="btn secondary" href="/painel">Ir para o painel</Link>
       </section>
     </main>
   );
