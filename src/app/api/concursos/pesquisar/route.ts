@@ -225,8 +225,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const queryWords: string[] = expandedTerms.join(' ').toLowerCase().split(/\\s+/)
-      .filter((word: string) => word.length > 1 && !/^20\\d{2}$/.test(word));
+    const queryWords: string[] = expandedTerms.join(' ').toLowerCase().split(/\s+/)
+      .filter((word: string) => word.length > 1 && !/^20\d{2}$/.test(word));
     results.sort((a, b) => rank(b, queryWords) - rank(a, queryWords));
 
     return NextResponse.json({
