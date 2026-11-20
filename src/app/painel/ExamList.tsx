@@ -63,6 +63,7 @@ export default function ExamList({ initialExams }: { initialExams: Exam[] }) {
               </div>
               <div className="exam-actions">
                 <Link className="btn" href={`/editais/${exam.id}/analisar`}>Analisar edital</Link>
+                <Link className="btn alt" href={`/editais/${exam.id}/planejar`}>Montar cronograma</Link>
                 <button className="btn danger" type="button" disabled={busy === exam.id} onClick={() => remove(exam)}>
                   {busy === exam.id ? 'Excluindo...' : 'Excluir'}
                 </button>
