@@ -119,13 +119,35 @@ export async function POST(req: Request) {
 
     // A página oficial da FGV deve aparecer mesmo que o buscador não interprete a sigla "PA".
     if (isSeducPa) {
-      const official = 'https://conhecimento.fgv.br/concursos/seducpa26';
-      unique.set(official, {
-        title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (página oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (página oficial)',
-        url: official,
-        snippet: 'Página oficial da FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais da edição 2026.',
-        source: 'conhecimento.fgv.br',
-      });
+      const knownSources: Result[] = [
+        {
+          title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (página oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (página oficial)',
+          url: 'https://conhecimento.fgv.br/concursos/seducpa26',
+          snippet: 'Página oficial da FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais da edição 2026.',
+          source: 'conhecimento.fgv.br',
+        },
+        {
+          title: 'SEDUC-PA 2026 — Edital nº 1 | Qconcursos',
+          url: 'https://www.qconcursos.com/questoes-de-concursos/concursos/seduc-pa-2026-edital-n-1',
+          snippet: 'Página especializada com informações do concurso SEDUC-PA 2026, banca FGV, cargos, vagas e data da prova.',
+          source: 'qconcursos.com',
+        },
+        {
+          title: 'Concurso SEDUC-PA: edital e informações | Aprova Concursos',
+          url: 'https://www.aprovaconcursos.com.br/noticias/concurso-seduc-pa/',
+          snippet: 'Notícia especializada sobre o concurso da Secretaria de Educação do Pará, com referência ao edital e às 2.000 vagas.',
+          source: 'aprovaconcursos.com.br',
+        },
+        {
+          title: 'Governo do Pará publica edital de concurso da Seduc | Agência Pará',
+          url: 'https://www.agenciapara.com.br/noticia/79372/governo-do-para-publica-nesta-segunda-feira-31-edital-de-concurso-da-seduc-com-2-mil-vagas-abertas',
+          snippet: 'Notícia do Governo do Pará sobre a publicação do edital da SEDUC, com informações sobre vagas e etapas.',
+          source: 'agenciapara.com.br',
+        },
+      ];
+      for (const item of knownSources) {
+        if (!year || (item.title + ' ' + item.url + ' ' + item.snippet).includes(year)) unique.set(item.url, item);
+      }
     }
 
     let results = [...unique.values()];
