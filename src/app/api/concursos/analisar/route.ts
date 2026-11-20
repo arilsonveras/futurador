@@ -211,7 +211,14 @@ export async function POST(req:Request){
      const candidateType=(fetched.response.headers.get('content-type')||'').toLowerCase();
      if(candidate.byteLength<=15*1024*1024&&(candidateType.includes('pdf')||fetched.url.pathname.toLowerCase().endsWith('.pdf'))){
       buffer=candidate;sourceUrl=fetched.url;sourceType='pdf';evidenceUrl=sourceUrl.toString();
-      parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+      try{
+       const extracted=await extractRelevantPdfText(buffer);
+       localPages=extracted.pages;
+       parts=[{text:'TEXTO EXTRAÍDO LOCALMENTE DO EDITAL EM PDF. Preserve os números das páginas entre colchetes nas evidências.\n\n'+extracted.text}];
+      }catch(error){
+       console.error('[Futurador][PDF] Falha na extração local do PDF vinculado',error instanceof Error?error.message:'erro desconhecido');
+       parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+      }
      }
     }catch{/* mantém a página como fonte e informa a limitação no prompt */}
    }
