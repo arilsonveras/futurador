@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       results = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
     }
     results.sort((a, b) => rank(b, [base, year || '']) - rank(a, [base, year || '']));
-    results = results.slice(0, 20);
+    // Mantém todos os resultados únicos retornados pela pesquisa para a pessoa escolher.
 
     return NextResponse.json({
       query,
