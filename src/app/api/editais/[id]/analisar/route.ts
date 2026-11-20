@@ -153,7 +153,7 @@ ${text}`;
     if (!positions.length || !subjects.length) return fail('A IA não encontrou cargos e disciplinas com evidências suficientes. Nada foi salvo. Revise o PDF ou tente novamente.', 422);
     return NextResponse.json({
       positions,
-      subjects: subjects.map(subject => ({ ...subject, topics: subject.topics.map(topic => topic.title), topicSources: subject.topics })),
+      subjects: subjects.map(subject => ({ ...subject, positionName: subject.scope === 'specific' ? subject.positionNames[0] : null, topics: subject.topics.map(topic => topic.title), topicSources: subject.topics })),
       warnings,
       analysisMethod: 'ai',
     });
