@@ -52,9 +52,9 @@ function extractFgvPositions(text: string): ParsedPosition[] {
       const pattern = group.role === 'Professor Classe I'
         ? new RegExp('PROFESSOR\\s+' + form + '\\s+NIVEL\\s+SUPERIOR', 'g')
         : group.role === 'Especialista em Educação'
-          ? /ESPECIALISTA\s+EM\s+EDUCACAO\s+NIVEL\s+SUPERIOR/g
+          ? /ESPECIALISTA\s+EM\s+EDUCACAO(?:\s+ESPECIALISTA\s+EM\s+EDUCACAO)?\s+NIVEL\s+SUPERIOR/g
           : group.role.startsWith('Assistente')
-            ? /ASSISTENTE\s+DE\s+GESTAO\s+GOVERNAMENTAL\s+E\s+EDUCACIONAL\s+NIVEL\s+MEDIO/g
+            ? /ASSISTENTE\s+DE\s+GESTAO\s+GOVERNAMENTAL\s+E\s+EDUCACIONAL(?:\s+ASSISTENTE\s+DE\s+GESTAO\s+GOVERNAMENTAL\s+E\s+EDUCACIONAL)?\s+NIVEL\s+MEDIO/g
             : new RegExp(role + '\\s+' + form + '\\s+NIVEL\\s+SUPERIOR', 'g');
       if (!pattern.test(appendix)) continue;
       const name = group.role === 'Especialista em Educação' || group.role.startsWith('Assistente') ? group.role : group.role + ' — ' + formation;
@@ -71,7 +71,7 @@ function extractFgvPositions(text: string): ParsedPosition[] {
 function extractNamedSubjects(block: string, definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }>, scope: 'common' | 'specific', groupPositionNames: string[] = []) {
   const matches: Array<{ start: number; end: number; definition: typeof definitions[number] }> = [];
   for (const definition of definitions) {
-    const pattern = new RegExp('(?:^|[.!?]\\s+)(' + escapeRegex(definition.label) + ')\\s*\\.', 'gi');
+    const pattern = new RegExp('(?:^\\s*|[.!?]\\s+)(' + escapeRegex(definition.label) + ')\\s*\\.', 'gi');
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(block)) !== null) {
       const offset = match.index + match[0].lastIndexOf(match[1]);
