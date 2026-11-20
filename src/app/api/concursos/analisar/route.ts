@@ -65,9 +65,11 @@ export async function POST(req:Request){
    const anchors=[...html.matchAll(/<a\b([^>]*)href\s*=\s*["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi)].map(m=>({
     href:m[2],label:htmlText(m[4]),attrs:(m[1]+' '+m[3]).toLowerCase()
    }));
-   const editalLink=anchors.map(a=>({...a,url:safeUrl(new URL(a.href,sourceUrl).toString())}))
-    .filter(a=>a.url&&(/edital|retifica|vers[aã]o acess[ií]vel/i.test(a.label+' '+a.attrs+' '+a.href)))
-    .sort((a,b)=>Number(/retific|edital/i.test(b.label+' '+b.href))-Number(/retific|edital/i.test(a.label+' '+a.href)))[0];
+   const editalLink=anchors.map(a=>({...a,url:safeUrl(new URL(a.href,sourceUrl).toString()),descriptor:(a.label+' '+a.attrs+' '+a.href).toLowerCase()}))
+    // Nunca selecionar automaticamente demanda, concorrência, lista de inscritos ou resultados como se fossem o edital.
+    .filter(a=>a.url&&!/demanda|candidat[oa]s?\s*(por|\/|-)\s*vaga|concorr[eê]ncia|inscri[cç][oõ]es|resultado|classifica[cç][aã]o|gabarito|convoca[cç][aã]o/.test(a.descriptor))
+    .filter(a=>/edital|retifica|vers[aã]o acess[ií]vel/.test(a.descriptor))
+    .sort((a,b)=>Number(/edital.{0,30}(abertura|\d{3})|abertura/.test(b.descriptor))-Number(/edital.{0,30}(abertura|\d{3})|abertura/.test(a.descriptor)))[0];
    if(editalLink?.url){
     try{
      const fetched=await getSource(editalLink.url);
@@ -86,8 +88,9 @@ export async function POST(req:Request){
   }
   parts.push({text:`Você é especialista em leitura de editais de concursos públicos brasileiros. Faça uma extração minuciosa, priorizando o edital mais recente e suas retificações. Não use conhecimento externo nem invente dados.
 Responda exclusivamente JSON válido neste formato:
-{"examName":string|null,"institution":string|null,"organizer":string|null,"examDate":"YYYY-MM-DD"|null,"positions":[{"name":string,"category":string|null,"formation":string|null,"educationLevel":string|null,"vacancies":number|null,"immediateVacancies":number|null,"reserveList":boolean|null,"vacancyBreakdown":{"general":number|null,"disability":number|null,"black":number|null,"indigenous":number|null,"quilombola":number|null},"evidence":string}],"subjects":[{"name":string,"positionNames":string[],"scope":"common"|"specific","module":"basic"|"specific","topics":[string],"evidence":string}],"officialSource":boolean,"warnings":string[]}.
+{"documentType":"edital_abertura"|"retificacao"|"demanda"|"resultado"|"outro"|"incerto","isOfficialNotice":boolean,"examName":string|null,"institution":string|null,"organizer":string|null,"examDate":"YYYY-MM-DD"|null,"positions":[{"name":string,"category":string|null,"formation":string|null,"educationLevel":string|null,"vacancies":number|null,"immediateVacancies":number|null,"reserveList":boolean|null,"vacancyBreakdown":{"general":number|null,"disability":number|null,"black":number|null,"indigenous":number|null,"quilombola":number|null},"evidence":string}],"subjects":[{"name":string,"positionNames":string[],"scope":"common"|"specific","module":"basic"|"specific","topics":[string],"evidence":string}],"officialSource":boolean,"warnings":string[]}.
 REGRAS OBRIGATÓRIAS:
+0) IDENTIFICAÇÃO DO DOCUMENTO (ANTES DE EXTRAIR QUALQUER DADO): classifique o documento efetivamente recebido. "demanda" inclui relação de candidatos por vaga, demanda por vaga, concorrência e estatísticas de inscritos; "resultado" inclui classificação, gabarito, convocação e resultados. Se for demanda, resultado, outro documento ou incerto, defina isOfficialNotice=false, documentType correspondente, positions=[], subjects=[], examDate=null e explique em warnings que esse arquivo não é o edital de abertura e não contém base segura para o cronograma. NÃO extraia cargos ou vagas de tabelas de demanda. Só use isOfficialNotice=true quando o documento for claramente edital de abertura ou retificação oficial do edital. Uma retificação isolada não autoriza inventar o conteúdo programático ausente: informe se o edital de abertura/anexo de conteúdo não foi localizado.
 1) CARGOS: não pare em categorias genéricas como "Professor" ou "Especialista em Educação". Extraia cada opção específica de inscrição/formação exatamente como aparece no quadro de vagas: por exemplo "Professor Classe I - Matemática", "Professor Classe I - Língua Portuguesa", etc. Cada especialidade/formação deve ser uma opção separada em positions. Inclua também os cargos administrativos específicos.
 2) VAGAS: para cada opção específica, extraia o total de vagas do quadro de vagas e, se possível, vagas imediatas, cadastro de reserva e distribuição por cotas. Não confunda quantidade de inscritos/demanda com número de vagas. Se o documento não informar, use null.
 3) CONTEÚDO PROGRAMÁTICO: percorra o edital até os anexos de conteúdo programático. Extraia TODAS as disciplinas e TODOS os tópicos/subtópicos para o cargo/especialidade correspondente. Não retorne apenas títulos de disciplinas. Não misture conteúdo de especialidades diferentes. Disciplinas comuns devem ser associadas a todos os cargos a que o edital as atribui. Preserve hierarquia e texto dos tópicos. Se o conteúdo estiver em anexo separado, identifique isso em warnings em vez de inventar.
@@ -117,7 +120,10 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   const output=payload?.candidates?.[0]?.content?.parts?.map((p:any)=>p.text||'').join('')||'';
   const data=jsonFrom(output);
   if(!Array.isArray(data.positions)||!Array.isArray(data.subjects))throw new Error('A análise retornou uma estrutura incompleta.');
-  const positions=data.positions.filter((x:any)=>x&&typeof x.name==='string').slice(0,150).map((x:any)=>({
+  const documentType=['edital_abertura','retificacao','demanda','resultado','outro','incerto'].includes(data.documentType)?data.documentType:'incerto';
+  const isOfficialNotice=data.isOfficialNotice===true&&(documentType==='edital_abertura'||documentType==='retificacao');
+  const rejectedDocument=!isOfficialNotice||documentType==='demanda'||documentType==='resultado'||documentType==='outro'||documentType==='incerto';
+  const positions=(rejectedDocument?[]:data.positions).filter((x:any)=>x&&typeof x.name==='string').slice(0,150).map((x:any)=>({
    name:x.name,category:typeof x.category==='string'?x.category:null,formation:typeof x.formation==='string'?x.formation:null,
    educationLevel:typeof x.educationLevel==='string'?x.educationLevel:null,
    vacancies:Number.isFinite(x.vacancies)?x.vacancies:null,immediateVacancies:Number.isFinite(x.immediateVacancies)?x.immediateVacancies:null,
@@ -125,14 +131,15 @@ Documento efetivamente analisado: ${evidenceUrl}`});
    vacancyBreakdown:x.vacancyBreakdown&&typeof x.vacancyBreakdown==='object'?x.vacancyBreakdown:null,
    evidence:typeof x.evidence==='string'?x.evidence:''
   }));
-  const subjects=data.subjects.filter((x:any)=>x&&typeof x.name==='string'&&Array.isArray(x.topics)).slice(0,200).map((x:any)=>({
+  const subjects=(rejectedDocument?[]:data.subjects).filter((x:any)=>x&&typeof x.name==='string'&&Array.isArray(x.topics)).slice(0,200).map((x:any)=>({
    name:x.name,positionNames:Array.isArray(x.positionNames)?x.positionNames.filter((n:any)=>typeof n==='string'):[],
    scope:x.scope==='specific'?'specific':'common',module:x.module==='specific'?'specific':'basic',topics:x.topics.filter((t:any)=>typeof t==='string').slice(0,300),
    evidence:typeof x.evidence==='string'?x.evidence:''
   }));
   const warnings=Array.isArray(data.warnings)?data.warnings.filter((x:any)=>typeof x==='string').slice(0,20):[];
+  if(rejectedDocument)warnings.unshift(documentType==='demanda'?'O arquivo selecionado é uma relação de candidatos por vaga/demanda, não o edital de abertura. O Futurador descartou os cargos e números desse documento. Volte à pesquisa e selecione o edital oficial de abertura ou a página oficial da banca.':'O arquivo selecionado não foi identificado com segurança como edital de abertura ou retificação oficial. Nenhum cargo, disciplina ou data foi aproveitado.');
   if(sourceType!=='pdf')warnings.unshift('A fonte analisada foi uma página HTML; o edital em PDF não foi localizado automaticamente. Confira o conteúdo antes de gerar o cronograma.');
   if(!subjects.length||subjects.every((s:any)=>!s.topics.length))warnings.push('Nenhum tópico programático foi extraído. O Futurador deve impedir a geração de um cronograma baseado em conteúdo vazio.');
-  return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
+  return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,documentType,isOfficialNotice,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
  }catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Não foi possível analisar a fonte.'},{status:502});}
 }
