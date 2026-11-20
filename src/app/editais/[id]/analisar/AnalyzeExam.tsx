@@ -51,7 +51,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
           pageText += value;
           if (typeof y === 'number') previousY = y;
         }
-        text += pageText + '\n';
+        text += '[[PAGE:' + pageNumber + ']]\n' + pageText + '\n';
       }
       if (!text.trim()) throw new Error('O PDF não contém texto selecionável. Este arquivo precisa de OCR.');
       const parsed = parseEditalText(text);
@@ -96,7 +96,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
     const { data: insertedPositions, error: positionError } = await supabase
       .from('exam_positions')
       .insert(result.positions.map((position, index) => ({
-        user_id: user.id, exam_id: examId, name: position.name, code: position.code, sort_order: index,
+        user_id: user.id, exam_id: examId, name: position.name, code: position.code, formation: position.formation || null, education_level: position.educationLevel || null, source_annex: position.sourceAnnex || null, source_page: null, sort_order: index,
       })))
       .select('id,name');
     if (positionError || !insertedPositions?.length) {
@@ -118,11 +118,28 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
         sort_order: index,
         position_id: positionId,
         scope_type: subject.scope,
+        module: subject.module || null,
+        question_count: subject.questionCount ?? null,
+        exam_stage: subject.examStage || null,
       }).select('id').single();
       if (subjectError || !inserted) {
         setMessage('Erro ao salvar a disciplina ' + subject.name + ': ' + (subjectError?.message || 'registro não retornado'));
         setBusy(false);
         return;
+      }
+      if (subject.scope === 'common' && subject.positionNames?.length) {
+        const links = subject.positionNames
+          .map(name => positionMap.get(key(name)))
+          .filter((positionId): positionId is string => Boolean(positionId))
+          .map(positionId => ({ user_id: user.id, subject_id: inserted.id, position_id: positionId }));
+        if (links.length) {
+          const { error: linkError } = await supabase.from('subject_positions').insert(links);
+          if (linkError) {
+            setMessage('A disciplina foi salva, mas não foi possível vincular aos cargos: ' + linkError.message);
+            setBusy(false);
+            return;
+          }
+        }
       }
       const topicRows = subject.topics.map((title, topicIndex) => ({
         user_id: user.id, subject_id: inserted.id, title, sort_order: topicIndex,
