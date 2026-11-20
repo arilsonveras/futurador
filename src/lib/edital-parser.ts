@@ -114,7 +114,7 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
     ['Física', 'Professor Classe I — Física'], ['Química', 'Professor Classe I — Química'],
     ['Biologia', 'Professor Classe I — Biologia'], ['Inglês', 'Professor Classe I — Língua Inglesa'],
     ['Artes', 'Professor Classe I — Artes'], ['Educação Física', 'Professor Classe I — Educação Física'],
-    ['Educação Especial', 'Professor Classe I — Educação Especial - AEE'], ['Especialista em Educação', 'Especialista em Educação'],
+    ['Educação Especial', 'Professor Classe I — Educação Especial - AEE'], ['Língua Portuguesa Libras', 'Professor Classe I — Educação Especial - LIBRAS'], ['Especialista em Educação', 'Especialista em Educação'],
   ] as const;
 
   for (const section of sections) {
@@ -141,20 +141,20 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
       let definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }> = [];
       if (number === 1) definitions = professorSpecific.map(([label, positionName]) => ({ label, positionName, module: 'specific', questions: 30 }));
       else if (number === 2) definitions = [
-        { label: 'Nutrição', positionName: 'Analista de Suporte Educacional — Nutrição', module: 'specific', questions: 30 },
-        { label: 'Psicologia', positionName: 'Analista de Suporte Educacional — Psicologia', module: 'specific', questions: 30 },
-        { label: 'Serviço Social', positionName: 'Analista de Suporte Educacional — Serviço Social', module: 'specific', questions: 30 },
+        { label: 'Nutricionista', positionName: 'Analista de Suporte Educacional — Nutrição', module: 'specific', questions: 30 },
+        { label: 'Psicólogo', positionName: 'Analista de Suporte Educacional — Psicologia', module: 'specific', questions: 30 },
+        { label: 'Assistente Social', positionName: 'Analista de Suporte Educacional — Serviço Social', module: 'specific', questions: 30 },
       ];
       else if (number === 3) definitions = [
-        { label: 'Administração', positionName: 'Analista de Gestão Governamental e Política Educacional — Administração', module: 'specific', questions: 30 },
-        { label: 'Ciências Contábeis', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Contábeis', module: 'specific', questions: 30 },
-        { label: 'Ciências Econômicas', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Econômicas', module: 'specific', questions: 30 },
+        { label: 'Administrador', positionName: 'Analista de Gestão Governamental e Política Educacional — Administração', module: 'specific', questions: 30 },
+        { label: 'Contador', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Contábeis', module: 'specific', questions: 30 },
+        { label: 'Economista', positionName: 'Analista de Gestão Governamental e Política Educacional — Ciências Econômicas', module: 'specific', questions: 30 },
         { label: 'Estatística', positionName: 'Analista de Gestão Governamental e Política Educacional — Estatística', module: 'specific', questions: 30 },
-        { label: 'Arquitetura e Urbanismo', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Arquitetura e Urbanismo', module: 'specific', questions: 30 },
-        { label: 'Engenharia Civil', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Civil', module: 'specific', questions: 30 },
-        { label: 'Engenharia Elétrica', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Elétrica', module: 'specific', questions: 30 },
+        { label: 'Arquiteto', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Arquitetura e Urbanismo', module: 'specific', questions: 30 },
+        { label: 'Engenheiro Civil', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Civil', module: 'specific', questions: 30 },
+        { label: 'Engenheiro Elétrico', positionName: 'Analista de Gestão Governamental e Infraestrutura Educacional — Engenharia Elétrica', module: 'specific', questions: 30 },
       ];
-      else definitions = [{ label: 'Assistente de Gestão Governamental e Educacional', positionName: 'Assistente de Gestão Governamental e Educacional', module: 'specific', questions: 30 }];
+      else definitions = [{ label: 'Assistente de Gestão Administrativa', positionName: 'Assistente de Gestão Governamental e Educacional', module: 'specific', questions: 30 }];
       subjects.push(...extractNamedSubjects(specificBlock, definitions, 'specific'));
     }
   }
