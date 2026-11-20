@@ -168,7 +168,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
 
   const counts = result?.positions.map(position => ({
     ...position,
-    subjects: result.subjects.filter(subject => subject.scope === 'specific' && key(subject.positionName || '') === key(position.name)),
+    subjects: result.subjects.filter(subject => (subject.scope === 'specific' && key(subject.positionName || '') === key(position.name)) || (subject.scope === 'common' && subject.positionNames?.some(name => key(name) === key(position.name)))),
   })) || [];
   const commonCount = result?.subjects.filter(subject => subject.scope === 'common').length || 0;
 
@@ -186,10 +186,11 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
             {counts.map((position, index) => (
               <div className="availability-day" key={position.name}>
                 <strong>{position.code ? position.code + ' — ' : ''}{position.name}</strong>
-                <span>{position.subjects.length} disciplina(s) específicas</span>
+                <span>{position.subjects.length} disciplina(s) vinculadas</span>
+                <ul className="topic-preview">{position.subjects.map(subject => <li key={subject.name}>{subject.name} <small>({subject.scope === 'common' ? 'comum ao grupo' : 'específica'}) · {subject.topics.length} tópico(s)</small></li>)}</ul>
               </div>
             ))}
-            <p className="muted">{commonCount} disciplina(s) foram identificadas como conteúdo comum. Elas serão compartilhadas entre os cargos.</p>
+            <p className="muted">{commonCount} disciplina(s) comuns foram identificadas. Elas serão vinculadas apenas aos grupos de cargos previstos no Anexo V, sem aparecer para todos indiscriminadamente.</p>
             <h2>Disciplinas encontradas</h2>
             {result.subjects.map((subject, index) => (
               <div className="availability-day" key={subject.name + index}>
