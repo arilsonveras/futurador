@@ -16,7 +16,8 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
   if (error || !exam) notFound();
 
   const { data: subjects } = await supabase.from('subjects')
-    .select('id,name,sort_order').eq('exam_id', id).order('sort_order');
+    .select('id,name,sort_order,position_id,scope_type').eq('exam_id', id).order('sort_order');
+  const { data: positions } = await supabase.from('exam_positions').select('id,name,code,sort_order').eq('exam_id', id).order('sort_order');
   const subjectIds = (subjects || []).map(subject => subject.id);
   const { data: topicRows } = subjectIds.length
     ? await supabase.from('topics').select('id,title,subject_id,sort_order').in('subject_id', subjectIds).order('sort_order')
@@ -26,6 +27,8 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
     id: topic.id,
     title: topic.title,
     subjectName: subjectNames.get(topic.subject_id) || 'Disciplina',
+    positionId: (subjects || []).find(subject => subject.id === topic.subject_id)?.position_id || null,
+    scopeType: (subjects || []).find(subject => subject.id === topic.subject_id)?.scope_type || 'unassigned',
   }));
 
   const { data: availability } = await supabase.from('study_availability')
@@ -39,6 +42,7 @@ export default async function PlanejarEdital({ params }: { params: Promise<{ id:
       examTitle={exam.title}
       examDate={exam.exam_date}
       topics={topics}
+      positions={positions || []}
       initialAvailability={availability || []}
       existingPlanId={plans?.[0]?.id || null}
     />
