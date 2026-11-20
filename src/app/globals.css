@@ -30,3 +30,29 @@
 .loader-progress-track{width:100%;height:9px;overflow:hidden;border-radius:999px;background:#e8eee3;box-shadow:inset 0 1px 2px rgba(20,50,32,.08)}
 .loader-progress-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#709342,#b4d56a);transition:width .45s ease}
 .fullscreen-loader-card>small{margin-top:12px}
+
+
+/* Seletor compacto e pesquisável de cargos */
+.role-picker{margin:22px 0 18px;padding:16px;border:1px solid #e4eadc;border-radius:12px;background:#fbfcf9;scroll-margin-top:18px}
+.role-picker-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.role-picker-heading h3{margin:0 0 4px!important;font-size:16px!important;color:#263b2e}
+.role-picker-heading p{margin:0;color:#7b887e;font-size:11px;line-height:1.45}
+.role-picker-heading>span{flex-shrink:0;padding:5px 8px;border-radius:20px;background:#edf3e5;color:#59783b;font-size:10px;font-weight:800}
+.role-search{display:flex;align-items:center;gap:9px;height:42px;padding:0 12px;border:1px solid #dfe7d8;border-radius:9px;background:#fff;color:#78906a}
+.role-search>span{font-size:20px;line-height:1}
+.role-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#26362c;font:inherit;font-size:12px}
+.role-search input::placeholder{color:#9aa59b}
+.role-search button{border:0;background:transparent;color:#71806f;font-size:20px;cursor:pointer}
+.role-list{display:grid;gap:6px;margin-top:10px}
+.role-row{display:flex;align-items:center;gap:10px;width:100%;min-height:43px;padding:8px 10px;border:1px solid #e8ede3;border-radius:8px;background:#fff;text-align:left;color:#344438;cursor:pointer}
+.role-row.active{border-color:#8eae4c;background:#f2f7e9}
+.role-radio{display:grid;place-items:center;flex:0 0 18px;width:18px;height:18px;border:1px solid #cbd7c2;border-radius:50%;color:#fff;font-size:11px;font-weight:900}
+.role-row.active .role-radio{border-color:#739342;background:#739342}
+.role-name{display:grid;gap:2px;flex:1;min-width:0;font-size:12px;font-weight:700;line-height:1.35}
+.role-name small{font-size:10px;font-weight:400;color:#829087}
+.role-vacancies{flex-shrink:0;color:#849080;font-size:10px}
+.role-show-more{display:block;margin:10px auto 0;padding:5px 8px;border:0;background:transparent;color:#66823f;font-size:11px;font-weight:800;cursor:pointer}
+.role-empty{margin:12px 0 2px;color:#7c897f;font-size:12px}
+.selected-role-label{display:grid;gap:4px;margin:18px 0 8px;padding:10px 12px;border-left:3px solid #8eae4c;background:#f7faef;color:#75836d;font-size:9px;font-weight:800;letter-spacing:.7px}
+.selected-role-label b{color:#2d4032;font-size:13px;letter-spacing:0}
+@media(max-width:600px){.role-picker{padding:12px}.role-picker-heading h3{font-size:15px!important}.role-row{padding:9px 8px}.role-vacancies{font-size:9px}}
