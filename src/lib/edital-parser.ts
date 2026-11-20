@@ -23,8 +23,8 @@ function normalize(value: string) {
 function clean(value: string) { return value.replace(/\s+/g, ' ').replace(/^[-•▪◦]+\s*/, '').trim(); }
 function escapeRegex(value: string) { return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'); }
 function splitTopics(value: string) {
-  return value.replace(/\[\[PAGE:\d+\]\]/g, ' ').split(/\s*;\s*/)
-    .map(item => item.replace(/\s+/g, ' ').trim()).filter(item => item.length > 12);
+  return value.replace(/\[\[PAGE:\d+\]\]/g, ' ').split(/(?<=[.;])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9])/)
+    .map(item => item.replace(/\s+/g, ' ').replace(/^\d+\.\s*/, '').trim()).filter(item => item.length > 12);
 }
 
 const professorFormations = ['Matemática', 'Língua Portuguesa', 'História', 'Geografia', 'Filosofia', 'Sociologia', 'Física', 'Química', 'Biologia', 'Língua Inglesa', 'Artes', 'Educação Física', 'Educação Especial - AEE', 'Educação Especial - LIBRAS'];
