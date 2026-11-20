@@ -211,26 +211,22 @@ export async function POST(req: Request) {
       if (!previous || item.snippet.length > previous.snippet.length) unique.set(item.url, item);
     }
 
-    // Exibe exclusivamente páginas da banca organizadora oficial.
-    // Para SEDUC-PA, a página da FGV é a fonte oficial confirmada.
-    if (isSeducPa) {
-      const officialFgv: Result = {
-        title: year ? 'Concurso Público SEDUC-PA ' + year + ' — FGV Conhecimento (banca oficial)' : 'Concurso Público SEDUC-PA — FGV Conhecimento (banca oficial)',
-        url: 'https://conhecimento.fgv.br/concursos/seducpa26',
-        snippet: 'Página oficial da banca FGV para o concurso da SEPLAD e da Secretaria de Estado de Educação do Pará. Reúne edital, retificações, cronograma e publicações oficiais.',
-        source: 'conhecimento.fgv.br',
-      };
-      unique.set(officialFgv.url, officialFgv);
-    }
+    // Mantém apenas fontes oficiais: banca organizadora ou órgão público.
+    let results = [...unique.values()].filter((item) => isTrustedOfficialUrl(item.url));
 
-    let results = [...unique.values()].filter((item) => isOfficialExamBoardUrl(item.url));
-
-    // O ano só restringe quando foi digitado explicitamente pelo candidato.
+    // Prefira o ano informado, mas não elimine todos os resultados se o índice
+    // de busca não repetir o ano no título, URL ou trecho.
+    let yearFilterApplied = false;
     if (year) {
-      results = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
+      const yearMatches = results.filter((item) => (item.title + ' ' + item.url + ' ' + item.snippet).includes(year));
+      if (yearMatches.length > 0) {
+        results = yearMatches;
+        yearFilterApplied = true;
+      }
     }
 
-    const queryWords: string[] = normalized.split(/\s+/).filter((word: string) => word.length > 1 && !/^20\d{2}$/.test(word));
+    const queryWords: string[] = expandedTerms.join(' ').toLowerCase().split(/\\s+/)
+      .filter((word: string) => word.length > 1 && !/^20\\d{2}$/.test(word));
     results.sort((a, b) => rank(b, queryWords) - rank(a, queryWords));
 
     return NextResponse.json({
