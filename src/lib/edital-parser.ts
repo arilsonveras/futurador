@@ -3,6 +3,7 @@ export type ParsedSubject = {
   topics: string[];
   scope: 'common' | 'specific';
   positionName: string | null;
+  positionNames?: string[];
   module?: 'basic' | 'specific';
   questionCount?: number | null;
   examStage?: string;
@@ -67,7 +68,7 @@ function extractFgvPositions(text: string): ParsedPosition[] {
   return positions;
 }
 
-function extractNamedSubjects(block: string, definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }>, scope: 'common' | 'specific') {
+function extractNamedSubjects(block: string, definitions: Array<{ label: string; positionName?: string | null; module: 'basic' | 'specific'; questions?: number }>, scope: 'common' | 'specific', groupPositionNames: string[] = []) {
   const matches: Array<{ start: number; end: number; definition: typeof definitions[number] }> = [];
   for (const definition of definitions) {
     const pattern = new RegExp('(?:^|[.!?]\\s+)(' + escapeRegex(definition.label) + ')\\s*\\.', 'gi');
@@ -84,7 +85,7 @@ function extractNamedSubjects(block: string, definitions: Array<{ label: string;
     const body = block.slice(current.end, matches[index + 1]?.start ?? block.length).trim();
     const topics = splitTopics(body);
     if (!topics.length) continue;
-    subjects.push({ name: current.definition.label, topics, scope, positionName: current.definition.positionName || null, module: current.definition.module, questionCount: current.definition.questions ?? null, examStage: 'Prova objetiva' });
+    subjects.push({ name: current.definition.label, topics, scope, positionName: current.definition.positionName || null, positionNames: scope === 'common' ? groupPositionNames : [], module: current.definition.module, questionCount: current.definition.questions ?? null, examStage: 'Prova objetiva' });
   }
   return subjects;
 }
@@ -133,7 +134,7 @@ function parseFgvSeduc(text: string): ParsedEdital | null {
       const definitions = number === 1
         ? commonBase.map(item => ({ ...item, questions: item.label === 'Raciocínio Lógico' || item.label === 'Atualidades' ? 5 : item.questions }))
         : commonBase.filter(item => item.label !== 'Conhecimentos Pedagógicos');
-      subjects.push(...extractNamedSubjects(basicBlock, definitions, 'common'));
+      subjects.push(...extractNamedSubjects(basicBlock, definitions, 'common', sectionPositions.map(position => position.name)));
     }
     if (specificIndex >= 0) {
       const specificBlock = sectionText.slice(specificIndex + 'CONHECIMENTOS ESPECÍFICOS'.length);
