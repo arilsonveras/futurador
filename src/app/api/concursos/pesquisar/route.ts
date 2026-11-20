@@ -60,6 +60,49 @@ function isOfficialExamBoardUrl(rawUrl: string) {
   }
 }
 
+// Além da banca, o próprio órgão público pode publicar e hospedar o edital.
+// Isso é comum em concursos de polícias, prefeituras, secretarias e tribunais.
+function isOfficialPublicBodyUrl(rawUrl: string) {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '');
+    return host.endsWith('.gov.br') || host.endsWith('.leg.br') ||
+      host.endsWith('.jus.br') || host.endsWith('.mil.br');
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedOfficialUrl(rawUrl: string) {
+  return isOfficialExamBoardUrl(rawUrl) || isOfficialPublicBodyUrl(rawUrl);
+}
+
+function queryAliases(query: string) {
+  const normalized = query.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase();
+  const aliases: string[] = [];
+  if (/\\bPMSP\\b|\\bPMESP\\b/.test(normalized)) {
+    aliases.push('Polícia Militar do Estado de São Paulo', 'PMESP', 'concursos.policiamilitar.sp.gov.br');
+  }
+  if (/\\bPMSC\\b/.test(normalized)) {
+    aliases.push('Polícia Militar de Santa Catarina', 'PM Santa Catarina', 'pm.sc.gov.br', 'Instituto AOCP');
+  }
+  if (/\\bPMERJ\\b/.test(normalized)) {
+    aliases.push('Polícia Militar do Estado do Rio de Janeiro', 'PMERJ');
+  }
+  if (/\\bPMMG\\b/.test(normalized)) {
+    aliases.push('Polícia Militar de Minas Gerais', 'PMMG');
+  }
+  if (/\\bPMPR\\b/.test(normalized)) {
+    aliases.push('Polícia Militar do Paraná', 'PMPR');
+  }
+  if (/\\bPCSP\\b/.test(normalized)) {
+    aliases.push('Polícia Civil do Estado de São Paulo');
+  }
+  if (/\\bPCSC\\b/.test(normalized)) {
+    aliases.push('Polícia Civil de Santa Catarina');
+  }
+  return aliases;
+}
+
 function rank(item: Result, terms: string[]) {
   const value = (item.url + ' ' + item.title + ' ' + item.snippet).toLowerCase();
   let score = 100;
@@ -123,6 +166,21 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     add('SEDUC Pará edital banca FGV' + suffix);
     add('site:conhecimento.fgv.br/concursos SEDUC Pará' + suffix);
   }
+
+  const aliases = queryAliases(query);
+  if (aliases.length) {
+    const expanded = aliases.join(' ');
+    add(expanded + ' concurso edital');
+    add(expanded + ' concurso público site:gov.br');
+  }
+
+  // Prefeituras frequentemente publicam o edital no próprio portal municipal,
+  // sem contratar uma banca externa. Pesquise diretamente fontes governamentais.
+  if (/prefeitura|municipio|municipal/i.test(base)) {
+    add(base + ' concurso edital processo seletivo site:gov.br');
+    add(base + ' edital oficial prefeitura');
+    add(base + ' processo seletivo site:gov.br');
+  }
   return [...terms];
 }
 
@@ -142,6 +200,9 @@ export async function POST(req: Request) {
     const isSeducPa = /seduc/.test(lower) && /\bpa\b|para/.test(lower);
     const searchTerms = addQueryVariants(normalized, year, isSeducPa);
     searchTerms.unshift(normalized);
+    const aliases = queryAliases(normalized);
+    if (aliases.length) searchTerms.push(...aliases.map((alias) => alias + ' concurso edital'));
+    const expandedTerms = [...new Set([normalized, ...aliases])];
 
     const batches = await Promise.all(searchTerms.map((term) => search(term).catch(() => [])));
     const unique = new Map<string, Result>();
@@ -176,11 +237,12 @@ export async function POST(req: Request) {
       query,
       results,
       searchedAt: new Date().toISOString(),
-      searchMode: year ? 'year-filtered' : 'broad',
+      searchMode: yearFilterApplied ? 'year-filtered' : 'broad',
       yearFilter: year,
-      message: year
-        ? 'Resultados filtrados para o ano informado.'
-        : 'Resultados ampliados. Acrescente banca, órgão ou ano para refinar a pesquisa.',
+      officialSourcesOnly: true,
+      message: yearFilterApplied
+        ? 'Resultados oficiais priorizados para o ano informado.'
+        : 'Busca ampliada em bancas organizadoras e portais oficiais dos órgãos públicos. Não foram exibidos sites divulgadores.',
     });
   } catch {
     return NextResponse.json({ error: 'O serviço de pesquisa não respondeu. Tente novamente em instantes.' }, { status: 502 });
