@@ -18,7 +18,7 @@ export type ParsedPosition = {
 export type ParsedEdital = { positions: ParsedPosition[]; subjects: ParsedSubject[]; warnings: string[] };
 
 function normalize(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/GOVERNAMENT\s+AL/g, 'GOVERNAMENTAL').replace(/ADMINISTRACA\s+O/g, 'ADMINISTRACAO').replace(/\s+/g, ' ').trim();
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 }
 function clean(value: string) { return value.replace(/\s+/g, ' ').replace(/^[-•▪◦]+\s*/, '').trim(); }
 function escapeRegex(value: string) { return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'); }
@@ -38,7 +38,7 @@ const roleGroups = [
 ];
 
 function extractFgvPositions(text: string): ParsedPosition[] {
-  const normalized = normalize(text).replace(/\[\[PAGE:\d+\]\]/g, ' ');
+  const normalized = normalize(text).replace(/\[\[PAGE:\d+\]\]/g, ' ').replace(/GOVERNAMENT\s+AL/g, 'GOVERNAMENTAL').replace(/ADMINISTRACA\s+O/g, 'ADMINISTRACAO');
   const start = normalized.indexOf('ANEXO II - QUADRO DE VAGAS');
   if (start < 0) return [];
   const endCandidates = [normalized.indexOf('ANEXO II-A', start + 10), normalized.indexOf('ANEXO III', start + 10)].filter(index => index >= 0);
