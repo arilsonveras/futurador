@@ -7,3 +7,20 @@
 .analysis-result{background:white;border:1px solid #dfe8d4;border-radius:14px;padding:24px;margin-top:18px}.analysis-result h2{font-size:24px;margin:10px 0}.analysis-result h3{font-size:14px;margin:22px 0 10px}.analysis-result>p{color:#68786f;font-size:12px;line-height:1.6}.analysis-result ul{padding-left:20px;color:#66756b;font-size:12px;line-height:1.8}.position-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.position-chips>div{border:1px solid #e5eadf;border-radius:9px;padding:13px;display:grid;gap:6px}.position-chips small{color:#7c897f;font-size:11px;line-height:1.5}.analysis-result .notice{margin:8px 0}
 
 .position-option{border:1px solid #e5eadf;border-radius:10px;padding:14px;background:white;text-align:left;display:grid;gap:7px;color:#26362c;cursor:pointer}.position-option small{color:#7c897f;font-size:11px;line-height:1.5}.position-option span{font-size:10px;color:#6e8c43;font-weight:900}.position-option.active{border:2px solid #8eae4c;background:#f7faef}.continue-plan{margin-top:24px;padding-top:18px;border-top:1px solid #e9eee4}.continue-plan>p{font-size:13px;color:#617267;line-height:1.6}
+
+/* Carregamento global durante operações demoradas */
+.fullscreen-loader{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:24px;background:rgba(13,28,21,.78);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.fullscreen-loader-card{width:min(390px,100%);padding:34px 28px 30px;background:#fff;border:1px solid #e4ebdc;border-radius:20px;box-shadow:0 25px 90px rgba(0,0,0,.24);display:flex;align-items:center;flex-direction:column;text-align:center}
+.fullscreen-loader-card>strong{font-size:22px;letter-spacing:-.8px;color:#174b3a;margin-top:18px}
+.fullscreen-loader-card>p{font-size:14px;line-height:1.6;color:#34483b;margin:10px 0 6px}
+.fullscreen-loader-card>small{font-size:11px;line-height:1.5;color:#829087}
+.loader-orbit{width:62px;height:62px;position:relative;border:3px solid #e7eedc;border-top-color:#709342;border-right-color:#a9c75d;border-radius:50%;animation:futurador-spin 1s linear infinite}
+.loader-orbit span{position:absolute;width:9px;height:9px;border-radius:50%;background:#b4d56a;top:3px;left:7px}
+.loader-orbit span:nth-child(2){width:7px;height:7px;top:auto;left:auto;right:2px;bottom:12px;background:#174b3a}
+.loader-orbit span:nth-child(3){width:6px;height:6px;top:25px;left:-4px;background:#8cae4c}
+@keyframes futurador-spin{to{transform:rotate(360deg)}}
+.results-section{scroll-margin-top:16px;padding-top:28px}
+.results-section:before{content:"RESULTADOS DA SUA PESQUISA";display:block;width:max-content;max-width:100%;margin:0 0 14px;padding:8px 12px;border-radius:8px;background:#eaf2dc;color:#4f7131;font-size:10px;font-weight:900;letter-spacing:1.2px}
+.results-heading{padding:18px 20px;background:#fff;border:1px solid #dfe8d4;border-radius:14px;margin-bottom:16px}
+.source-card{scroll-margin-top:20px}
+@media(prefers-reduced-motion:reduce){.loader-orbit{animation-duration:2.5s}.fullscreen-loader-card{transition:none}}
