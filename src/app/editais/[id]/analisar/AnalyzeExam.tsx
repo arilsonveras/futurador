@@ -19,7 +19,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [saved, setSaved] = useState(alreadyHasSubjects);
+  const [saved, setSaved] = useState(false);
   const started = useRef(false);
 
   async function extractPdf() {
@@ -81,6 +81,18 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
       return;
     }
 
+    const { data: currentPositions, error: currentPositionsError } = await supabase.from('exam_positions').select('id').eq('exam_id', examId).limit(1);
+    if (currentPositionsError) {
+      setMessage('Não foi possível verificar a análise anterior: ' + currentPositionsError.message);
+      setBusy(false);
+      return;
+    }
+    if (currentPositions?.length) {
+      setMessage('Este edital já possui cargos estruturados. Para evitar duplicação, não repetimos a gravação. Os dados antigos continuam preservados.');
+      setBusy(false);
+      return;
+    }
+
     const { data: insertedPositions, error: positionError } = await supabase
       .from('exam_positions')
       .insert(result.positions.map((position, index) => ({
@@ -132,7 +144,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
   }
 
   useEffect(() => {
-    if (started.current || alreadyHasSubjects) return;
+    if (started.current) return;
     started.current = true;
     void extractPdf();
   }, []);
@@ -149,7 +161,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
       <section className="panel">
         <h1>Análise estruturada do edital</h1>
         <p className="muted">{examTitle}</p>
-        {alreadyHasSubjects && <p className="message">Este edital já possui disciplinas cadastradas. Os dados existentes foram preservados para não apagar seu progresso. A reclassificação desses registros será uma etapa própria.</p>}
+        {alreadyHasSubjects && <p className="message">Este edital já possui uma análise anterior. A nova estrutura será gravada separadamente; os dados antigos e cronogramas existentes não serão apagados.</p>}
         {extracting && <p className="message">{message}</p>}
         {result && (
           <>
@@ -173,7 +185,7 @@ export default function AnalyzeExam({ examId, filePath, examTitle, alreadyHasSub
           </>
         )}
         {message && !extracting && <p className="message">{message}</p>}
-        {!result && !extracting && !alreadyHasSubjects && <button className="btn" type="button" onClick={extractPdf}>Analisar edital novamente</button>}
+        {!result && !extracting && <button className="btn" type="button" onClick={extractPdf}>Analisar edital novamente</button>}
         {saved && <Link className="btn" href={'/editais/' + examId + '/planejar'}>Continuar para montar cronograma</Link>}
         <Link className="btn secondary" href="/painel">Ir para o painel</Link>
       </section>
