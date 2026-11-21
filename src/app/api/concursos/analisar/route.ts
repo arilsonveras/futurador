@@ -216,8 +216,10 @@ export async function POST(req:Request){
   // O servidor do portal da PMESP apresenta uma cadeia TLS incompleta no ambiente
   // de execução. Para este concurso, prioriza a publicação integral no Diário Oficial
   // do Estado de São Paulo, que também é fonte pública oficial e contém o edital.
-  const sourceUrlToFetch = initialUrl.hostname === 'concursos.policiamilitar.sp.gov.br' &&
-    initialUrl.pathname.replace(/\/+$/, '') === '/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm'
+  const isPmespContestPath = initialUrl.hostname === 'concursos.policiamilitar.sp.gov.br' &&
+    (/\/concursos\/edital-dp-4-321-26-concurso-para-aluno-soldado-pm\/?$/.test(initialUrl.pathname) ||
+     /\/wp-content\/uploads\/2026\/11\/10\.-Minuta-do-Edital-no-DP-4\.321\.26/i.test(initialUrl.pathname));
+  const sourceUrlToFetch = isPmespContestPath
       ? new URL('https://doe.sp.gov.br/executivo/secretaria-da-seguranca-publica/edital-de-concurso-publico-n-dp-4-321-26-202611041336161962254080')
       : initialUrl;
   let fetchedSource:{response:Response;url:URL};
