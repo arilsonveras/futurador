@@ -228,3 +228,10 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid rgba(
  .calendar-nav button{padding:8px 9px}
  .calendar-task{align-items:flex-start}
 }
+
+
+/* Ação de cancelamento acessível no carregamento em tela cheia */
+.loader-cancel{margin-top:20px;min-width:180px;padding:11px 18px;border:1px solid #d7dfd2;border-radius:10px;background:#fff;color:#31583e;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.loader-cancel:hover{border-color:#9caf8c;background:#f4f7f0;transform:translateY(-1px)}
+.loader-cancel:focus-visible{outline:3px solid rgba(137,174,77,.45);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.loader-cancel{transition:none}.loader-cancel:hover{transform:none}}
