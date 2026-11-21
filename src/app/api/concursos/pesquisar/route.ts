@@ -100,8 +100,8 @@ function queryAliases(query: string) {
   if (/\bPCSC\b/.test(normalized)) {
     aliases.push('Polícia Civil de Santa Catarina');
   }
-  if (/SEFAZ?.*PA|SEFA.*PA|SEFAZPA/.test(normalized)) aliases.push('Secretaria de Estado da Fazenda do Pará', 'SEFA Pará', 'SEFA-PA', 'site:sefa.pa.gov.br', 'site:pa.gov.br');
-  if (/SEFAZ?.*PI|SEFA.*PI|SEFAZPI/.test(normalized)) aliases.push('Secretaria da Fazenda do Estado do Piauí', 'SEFAZ-PI', 'Fundação Carlos Chagas FCC');
+  if (/\\bSEFAZ?\\s*PA\\b|\\bSEFA\\s*PA\\b|\\bSEFAZPA\\b/.test(normalized)) aliases.push('Secretaria de Estado da Fazenda do Pará', 'SEFA Pará', 'SEFA-PA', 'site:sefa.pa.gov.br', 'site:pa.gov.br');
+  if (/\\bSEFAZ?\\s*PI\\b|\\bSEFA\\s*PI\\b|\\bSEFAZPI\\b/.test(normalized)) aliases.push('Secretaria da Fazenda do Estado do Piauí', 'SEFAZ-PI', 'Fundação Carlos Chagas FCC');
   if (/PMPA/.test(normalized)) aliases.push('Polícia Militar do Pará', 'CFP PMPA 2023', 'CFO PMPA 2023', 'Cebraspe', 'site:pm.pa.gov.br');
   if (/SEDUC/.test(normalized) && /PA|PARA/.test(normalized)) aliases.push('Secretaria de Estado de Educação do Pará', 'SEPLAD SEDUC Pará C-223', 'FGV SEDUC Pará');
   return aliases;
@@ -198,13 +198,13 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     if (/\bPMSC\b/i.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
   }
 
-  if (/SEFAZ?.*PA|SEFA.*PA|SEFAZPA/i.test(normalized)) {
+  if (/\\bSEFAZ?\\s*PA\\b|\\bSEFA\\s*PA\\b|\\bSEFAZPA\\b/i.test(normalized)) {
     add('site:sefa.pa.gov.br concurso SEFA Pará edital resultado');
     add('site:pa.gov.br SEFA concurso auditor fiscal edital');
     add('site:cebraspe.org.br SEFA Pará concurso edital');
     add('site:conhecimento.fgv.br SEFA Pará concurso');
   }
-  if (/SEFAZ?.*PI|SEFA.*PI|SEFAZPI/i.test(normalized)) {
+  if (/\\bSEFAZ?\\s*PI\\b|\\bSEFA\\s*PI\\b|\\bSEFAZPI\\b/i.test(normalized)) {
     add('site:pi.gov.br concurso SEFAZ PI edital 2025 FCC');
     add('site:concursosfcc.com.br/concursos/sefpi124 SEFAZ PI edital');
     add('site:diario.pi.gov.br SEFAZ concurso edital resultado');
@@ -323,7 +323,7 @@ export async function POST(req: Request) {
     if (/SEDUC/.test(normalizedUpper) && /PA|PARA/.test(normalizedUpper)) {
       directResults.push({ title: 'Concurso SEPLAD/SEDUC Pará — Edital nº 001/2026 (C-223)', url: 'https://conhecimento.fgv.br/concursos/seducpa26', snippet: 'Página oficial de acompanhamento da FGV para o concurso da SEPLAD e SEDUC-PA. Reúne edital consolidado, retificações e publicações do certame.', source: 'conhecimento.fgv.br — FGV Conhecimento' });
     }
-    if (/SEFAZ?.*PI|SEFA.*PI|SEFAZPI/.test(normalizedUpper)) {
+    if (/\\bSEFAZ?\\s*PI\\b|\\bSEFA\\s*PI\\b|\\bSEFAZPI\\b/.test(normalizedUpper)) {
       directResults.push({ title: 'Concurso SEFAZ-PI — Edital nº 01/2025', url: 'https://www.concursosfcc.com.br/concursos/sefpi124/index.html', snippet: 'Página oficial da Fundação Carlos Chagas para o concurso da Secretaria da Fazenda do Piauí, com edital e publicações do certame de 2025.', source: 'concursosfcc.com.br — Fundação Carlos Chagas' });
       directResults.push({ title: 'Governo do Piauí — Concurso da Secretaria da Fazenda', url: 'https://www.pi.gov.br/governo-do-estado-abre-inscricoes-para-concurso-da-sefaz-pi-com-salarios-de-ate-r-276-mil/', snippet: 'Notícia oficial do Governo do Piauí sobre o concurso SEFAZ-PI de 2025, organizado pela FCC, com 80 vagas.', source: 'pi.gov.br — Governo do Estado do Piauí' });
     }
@@ -331,7 +331,7 @@ export async function POST(req: Request) {
       directResults.push({ title: 'Concurso PMPA 2023 — Curso de Formação de Praças (CFP)', url: 'https://www.cebraspe.org.br/concursos/PM_PA_23_CFP', snippet: 'Página oficial do Cebraspe para o concurso da Polícia Militar do Pará: 4.000 vagas para o Curso de Formação de Praças, com edital, provas e publicações posteriores.', source: 'cebraspe.org.br — Cebraspe' });
       directResults.push({ title: 'Concurso PMPA 2023 — Curso de Formação de Oficiais (CFO)', url: 'https://www.cebraspe.org.br/concursos/PM_PA_23_CFO', snippet: 'Página oficial do Cebraspe para o concurso da Polícia Militar do Pará destinado ao Curso de Formação de Oficiais, com edital e publicações do certame.', source: 'cebraspe.org.br — Cebraspe' });
     }
-    for (const item of directResults) unique.set(item.url, item);    const normalizedUpper = normalized.toUpperCase();
+    for (const item of directResults) unique.set(item.url, item);
     if (/\bPMSP\b|\bPMESP\b/.test(normalizedUpper)) {
       const url = 'https://concursos.policiamilitar.sp.gov.br/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm/';
       unique.set(url, {
