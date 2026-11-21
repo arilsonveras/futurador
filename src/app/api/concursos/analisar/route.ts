@@ -163,7 +163,14 @@ export async function POST(req:Request){
   const key=process.env.GEMINI_API_KEY;
   const aiEnabled=!!key&&process.env.FUTURADOR_AI_ENABLED==='true';
 
-  let {response:source,url:sourceUrl}=await getSource(initialUrl);
+  // O portal da PMESP pode demorar ou falhar ao responder a requisições automatizadas.
+  // Para este edital, use diretamente o PDF hospedado no próprio domínio oficial,
+  // evitando depender da página HTML intermediária.
+  const sourceUrlToFetch = initialUrl.hostname === 'concursos.policiamilitar.sp.gov.br' &&
+    initialUrl.pathname.replace(/\/+$/, '') === '/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm'
+      ? new URL('https://concursos.policiamilitar.sp.gov.br/wp-content/uploads/2026/11/10.-Minuta-do-Edital-no-DP-4.321.26_-versao-final-site-PM-e-VUNESP.pdf')
+      : initialUrl;
+  let {response:source,url:sourceUrl}=await getSource(sourceUrlToFetch);
   let buffer=await source.arrayBuffer();
   if(buffer.byteLength>15*1024*1024)return NextResponse.json({error:'O documento ultrapassa o limite de 15 MB para análise automática.'},{status:413});
   let type=(source.headers.get('content-type')||'').toLowerCase();
