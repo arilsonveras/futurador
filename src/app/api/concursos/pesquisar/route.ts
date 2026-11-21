@@ -172,7 +172,7 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     const expanded = aliases.join(' ');
     add(expanded + ' concurso edital');
     add(expanded + ' concurso público site:gov.br');
-    if (/\\bPMSC\\b/.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
+    if (/\bPMSC\b/.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
   }
 
   // Prefeituras frequentemente publicam o edital no próprio portal municipal,
@@ -203,7 +203,7 @@ export async function POST(req: Request) {
     const isSeducPa = /seduc/.test(lower) && /\bpa\b|para/.test(lower);
 
     // Fontes oficiais de órgãos que costumam não ser bem indexadas pelo buscador.
-    if (/\\bPMSC\\b/.test(normalized.toUpperCase())) {
+    if (/\bPMSC\b/.test(normalized.toUpperCase())) {
       const officialResults: Result[] = [
         {
           title: 'Concurso para Soldados da PMSC — Edital nº 002/CCP/2026 (retificado)',
@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ query, results: officialResults, searchedAt: new Date().toISOString(), searchMode: 'official-direct', officialSourcesOnly: true, message: 'Concurso localizado diretamente no portal oficial da PMSC. Confira o edital consolidado e as retificações.' });
     }
 
-    if (/\\bTRair[aã]o\\b/i.test(query) || /\\bTRairao\\b/i.test(normalized)) {
+    if (/\bTrair[aã]o\b/i.test(query) || /\bTrairao\b/i.test(normalized)) {
       const officialResults: Result[] = [
         {
           title: 'Processos seletivos e concursos — Prefeitura Municipal de Trairão',
