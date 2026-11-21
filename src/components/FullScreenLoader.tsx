@@ -45,9 +45,11 @@ const messages: Record<Mode, string[]> = {
 export default function FullScreenLoader({
   message,
   mode = 'generic',
+  onCancel,
 }: {
   message?: string;
   mode?: Mode;
+  onCancel?: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(6);
@@ -87,7 +89,8 @@ export default function FullScreenLoader({
         <div className="loader-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayedProgress}>
           <span style={{ width: displayedProgress + '%' }} />
         </div>
-        <small>O percentual é uma estimativa visual. Estamos trabalhando nisso; não feche esta página.</small>
+        <small>O percentual é uma estimativa visual.</small>
+        {onCancel && <button type="button" className="loader-cancel" onClick={onCancel}>Cancelar operação</button>}
       </div>
     </div>
   );
