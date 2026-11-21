@@ -39,6 +39,7 @@ const OFFICIAL_EXAM_BOARD_DOMAINS = [
   'iades.com.br',
   'quadrix.org.br',
   'fundatec.org.br',
+  'fadesp.org.br',
   'fepese.org.br',
   'legalleconcursos.com.br',
   'objetivas.com.br',
@@ -322,6 +323,10 @@ export async function POST(req: Request) {
     const directResults: Result[] = [];
     if (/SEDUC/.test(normalizedUpper) && /PA|PARA/.test(normalizedUpper)) {
       directResults.push({ title: 'Concurso SEPLAD/SEDUC Pará — Edital nº 001/2026 (C-223)', url: 'https://conhecimento.fgv.br/concursos/seducpa26', snippet: 'Página oficial de acompanhamento da FGV para o concurso da SEPLAD e SEDUC-PA. Reúne edital consolidado, retificações e publicações do certame.', source: 'conhecimento.fgv.br — FGV Conhecimento' });
+    }
+    if (/\\bSEFAZ?\\s*PA\\b|\\bSEFA\\s*PA\\b|\\bSEFAZPA\\b/.test(normalizedUpper)) {
+      directResults.push({ title: 'Concurso SEFA-PA 2025 — página oficial da FADESP', url: 'https://concursos3.fadesp.org.br/estado/2025/sefa/web/', snippet: 'Página oficial da FADESP para o concurso da Secretaria de Estado da Fazenda do Pará de 2025.', source: 'concursos3.fadesp.org.br — FADESP' });
+      directResults.push({ title: 'Concurso SEFA-PA C-213 — Edital nº 01/2021', url: 'https://concursos2.fadesp.org.br/sefa2021/arquivos/Edital/EDITAL_N_01_ABERTURA_REP_DOE_N_34-810_27_12_2021-SEFA.pdf', snippet: 'Edital oficial do concurso C-213 para Auditor e Fiscal de Receitas Estaduais da SEFA-PA, organizado pela FADESP, com 48 vagas imediatas e cadastro de reserva.', source: 'concursos2.fadesp.org.br — FADESP' });
     }
     if (/\\bSEFAZ?\\s*PI\\b|\\bSEFA\\s*PI\\b|\\bSEFAZPI\\b/.test(normalizedUpper)) {
       directResults.push({ title: 'Concurso SEFAZ-PI — Edital nº 01/2025', url: 'https://www.concursosfcc.com.br/concursos/sefpi124/index.html', snippet: 'Página oficial da Fundação Carlos Chagas para o concurso da Secretaria da Fazenda do Piauí, com edital e publicações do certame de 2025.', source: 'concursosfcc.com.br — Fundação Carlos Chagas' });
