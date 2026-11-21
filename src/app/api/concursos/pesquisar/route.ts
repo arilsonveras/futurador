@@ -116,7 +116,11 @@ function rank(item: Result, terms: string[]) {
   return score;
 }
 
+const searchCache = new Map<string, { expiresAt: number; results: Result[] }>();
+
 async function search(term: string): Promise<Result[]> {
+  const cached = searchCache.get(term);
+  if (cached && cached.expiresAt > Date.now()) return cached.results;
   const response = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(term), {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Futurador/1.0)', Accept: 'text/html' },
     signal: AbortSignal.timeout(12000),
@@ -137,6 +141,12 @@ async function search(term: string): Promise<Result[]> {
     let source = '';
     try { source = new URL(url).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
     output.push({ title: clean(match[2]).slice(0, 240), url, snippet: snippetMatch ? clean(snippetMatch[1]).slice(0, 500) : '', source });
+  }
+  // Cache curto para evitar repetir a mesma consulta externa em navegações próximas.
+  searchCache.set(term, { expiresAt: Date.now() + 10 * 60 * 1000, results: output });
+  if (searchCache.size > 120) {
+    const oldestKey = searchCache.keys().next().value;
+    if (oldestKey) searchCache.delete(oldestKey);
   }
   return output;
 }
@@ -172,7 +182,7 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     const expanded = aliases.join(' ');
     add(expanded + ' concurso edital');
     add(expanded + ' concurso público site:gov.br');
-    if (/\bPMSC\b/.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
+    if (/\bPMSC\b/i.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
   }
 
   // Prefeituras frequentemente publicam o edital no próprio portal municipal,
