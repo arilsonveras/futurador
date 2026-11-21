@@ -268,8 +268,8 @@ function discoverOfficialPdfCandidates(html:string,baseUrl:URL){
  return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,20);
 }
 async function discoverCebraspeOpeningPdf(baseUrl:URL){
- if(!/(^|\\.)cebraspe\\.org\\.br$/i.test(baseUrl.hostname))return null;
- const contestMatch=baseUrl.pathname.match(/\\/concursos\\/([^/]+)/i);
+ if(!/(^|\.)cebraspe\.org\.br$/i.test(baseUrl.hostname))return null;
+ const contestMatch=baseUrl.pathname.match(/\/concursos\/([^/]+)/i);
  if(!contestMatch)return null;
  const slug=decodeURIComponent(contestMatch[1]).toLowerCase();
  const slugVariants=[...new Set([slug.toUpperCase(),slug.toUpperCase().replace(/-/g,'_'),slug.toUpperCase().replace(/_/g,'-')])];
