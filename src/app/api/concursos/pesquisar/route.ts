@@ -153,6 +153,7 @@ async function search(term: string): Promise<Result[]> {
 
 function addQueryVariants(query: string, year: string | null, isSeducPa: boolean) {
   const base = query.replace(/\b20\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
+  const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const terms = new Set<string>();
   const add = (value: string) => { if (value.trim()) terms.add(value.trim()); };
 
