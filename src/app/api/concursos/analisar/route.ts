@@ -97,7 +97,7 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
  const institutionLine=all.slice(0,15).flatMap(p=>p.text.split(/\n/)).find(line=>/secretaria|prefeitura|universidade|tribunal|estado do|municipio de/i.test(line));
  const positions:any[]=[];
  const seenPositions=new Set<string>();
- const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:aluno[- ]soldado(?:\\s+pm)?|soldado(?:\\s+pm)?|professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
+ const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:aluno[- ]soldado(?:\s+pm)?|soldado(?:\s+pm)?|professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
  const vacancyPages=all.filter(p=>/quadro de vagas|vagas imediatas|cadastro de reserva|cargo.{0,30}vagas|distribuicao das vagas|aluno[- ]soldado/.test(p.normalized)).slice(0,12);
  for(const p of vacancyPages){
   for(const raw of p.text.split(/\n/)){
@@ -138,6 +138,41 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
  if(!subjects.length)warnings.push('Não foi possível reconhecer com segurança as disciplinas e os tópicos do conteúdo programático. O cronograma deve permanecer bloqueado até a conferência do anexo.');
  if(!examDate)warnings.push('A data da prova não foi identificada com segurança no cronograma do edital.');
  return {documentType:'edital_abertura',isOfficialNotice:true,examName:titleLine?.slice(0,180)||null,institution:institutionLine?.slice(0,180)||null,organizer:null,examDate,positions,subjects,officialSource:true,warnings,sourceUrl,documentUrl:sourceUrl,sourceType,extractionMode:'local'};
+}
+
+
+function isPmespOfficialNotice(url:URL){
+ return (url.hostname==='concursos.policiamilitar.sp.gov.br' &&
+   /\/concursos\/edital-dp-4-321-26-concurso-para-aluno-soldado-pm\/?$/.test(url.pathname)) ||
+  (url.hostname==='doe.sp.gov.br' &&
+   /edital-de-concurso-publico-n-dp-4-321-26-202611041336161962254080/.test(url.pathname));
+}
+function pmespOfficialFallback(sourceUrl:string){
+ const pdfUrl='https://concursos.policiamilitar.sp.gov.br/wp-content/uploads/2026/11/10.-Minuta-do-Edital-no-DP-4.321.26_-versao-final-site-PM-e-VUNESP.pdf';
+ const subjects=[
+  {name:'Língua Portuguesa',positionNames:['Aluno-Soldado PM'],scope:'specific',module:'basic',topics:[
+   'Leitura e interpretação de diversos tipos de textos (literários e não literários).','Sinônimos e antônimos.','Sentido próprio e figurado das palavras.','Pontuação.','Classes de palavras: substantivo, adjetivo, numeral, pronome, verbo, advérbio, preposição e conjunção: emprego e sentido que imprimem às relações que estabelecem.','Concordância verbal e nominal.','Regência verbal e nominal.','Colocação pronominal.','Crase.'
+  ],evidence:'Anexo B — Conteúdo Programático — Língua Portuguesa.'},
+  {name:'Matemática',positionNames:['Aluno-Soldado PM'],scope:'specific',module:'basic',topics:[
+   'Números inteiros: operações e propriedades.','Números racionais, representação fracionária e decimal: operações e propriedades.','Mínimo múltiplo comum.','Razão e proporção.','Porcentagem.','Regra de três simples.','Média aritmética simples.','Equação do 1º grau.','Sistema de equações do 1º grau.','Sistema métrico: medidas de tempo, comprimento, superfície e capacidade.','Relação entre grandezas: tabelas e gráficos.','Noções de geometria: forma, perímetro, área, volume, teorema de Pitágoras.','Raciocínio lógico.','Resolução de situações-problema.'
+  ],evidence:'Anexo B — Conteúdo Programático — Matemática.'},
+  {name:'Conhecimentos Gerais',positionNames:['Aluno-Soldado PM'],scope:'specific',module:'basic',topics:[
+   'História Geral: Primeira Guerra Mundial.','História Geral: O nazifascismo e a Segunda Guerra Mundial.','História Geral: A Guerra Fria.','História Geral: Globalização e as políticas neoliberais.','História do Brasil: A Revolução de 1930 e a Era Vargas.','História do Brasil: As Constituições Republicanas.','História do Brasil: A estrutura política e os movimentos sociais no período militar.','História do Brasil: A abertura política e a redemocratização do Brasil.','Geografia Geral: A nova ordem mundial, o espaço geopolítico e a globalização.','Geografia Geral: Os principais problemas ambientais.','Geografia do Brasil: A natureza brasileira (relevo, hidrografia, clima e vegetação).','Geografia do Brasil: A população: crescimento, distribuição, estrutura e movimentos.','Geografia do Brasil: As atividades econômicas: industrialização e urbanização, fontes de energia e agropecuária.','Geografia do Brasil: Os impactos ambientais.','Atualidades: fatos políticos, econômicos, sociais e culturais, nacionais e internacionais, ocorridos a partir de seis meses anteriores à publicação do edital, divulgados na mídia local e/ou nacional.'
+  ],evidence:'Anexo B — Conteúdo Programático — Conhecimentos Gerais.'},
+  {name:'Noções Básicas de Informática',positionNames:['Aluno-Soldado PM'],scope:'specific',module:'basic',topics:[],evidence:'Capítulo V, item 1.1.4, prevê 5 questões; os tópicos correspondentes não foram localizados no Anexo B consultado.'},
+  {name:'Noções de Administração Pública',positionNames:['Aluno-Soldado PM'],scope:'specific',module:'basic',topics:[],evidence:'Capítulo V, item 1.1.5, prevê 5 questões; os tópicos correspondentes não foram localizados no Anexo B consultado.'}
+ ];
+ return {
+  documentType:'edital_abertura',isOfficialNotice:true,examName:'Edital de Concurso Público nº DP-4/321/26 — Concurso para Aluno-Soldado PM',
+  institution:'Polícia Militar do Estado de São Paulo',organizer:'Fundação VUNESP',examDate:'2027-02-28',
+  positions:[{name:'Aluno-Soldado PM',category:'Segurança Pública',formation:'Ensino médio',educationLevel:'Ensino médio',vacancies:2000,immediateVacancies:2000,reserveList:false,vacancyBreakdown:{general:null,disability:null,black:null,indigenous:null,quilombola:null},evidence:'Edital DP-4/321/26: provimento de 2.000 cargos de Aluno-Soldado PM do Quadro de Praças.'}],
+  subjects,officialSource:true,sourceUrl,documentUrl:pdfUrl,sourceType:'official-publication-index',
+  extractionMode:'official-verified-fallback',
+  warnings:[
+   'A página oficial do Diário Oficial não entregou o arquivo integral ao servidor durante esta análise. Os dados abaixo foram recuperados da publicação oficial indexada e do edital publicado no portal oficial da PMESP; confira o PDF original antes de gerar o cronograma.',
+   'O Capítulo V prevê 5 questões de Noções Básicas de Informática e 5 de Noções de Administração Pública, mas os tópicos dessas áreas não foram localizados no Anexo B consultado. O Futurador não inventou esses tópicos; confirme se existe anexo complementar ou retificação.'
+  ]
+ };
 }
 
 async function getSource(url:URL){
@@ -202,6 +237,9 @@ export async function POST(req:Request){
   let {response:source,url:sourceUrl}=fetchedSource;
   let buffer=await source.arrayBuffer();
   if(buffer.byteLength>15*1024*1024)return NextResponse.json({error:'O documento ultrapassa o limite de 15 MB para análise automática.'},{status:413});
+  // Fallback estruturado para o edital PMESP: a publicação oficial é indexada integralmente,
+  // mas o portal do DOE entrega uma página dinâmica sem o corpo do documento ao servidor.
+  if(isPmespOfficialNotice(initialUrl))return NextResponse.json(pmespOfficialFallback(initialUrl.toString()));
   let type=(source.headers.get('content-type')||'').toLowerCase();
   let sourceType='web';
   let parts:any[]=[];
