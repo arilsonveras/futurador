@@ -98,7 +98,7 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
  const positions:any[]=[];
  const seenPositions=new Set<string>();
  const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
- const vacancyPages=all.filter(p=>/quadro de vagas|vagas imediatas|cadastro de reserva|cargo.{0,30}vagas|distribuicao das vagas/.test(p.normalized)).slice(0,12);
+ const vacancyPages=all.filter(p=>/quadro de vagas|vagas imediatas|cadastro de reserva|cargo.{0,30}vagas|distribuicao das vagas|aluno[- ]soldado/.test(p.normalized)).slice(0,12);
  for(const p of vacancyPages){
   for(const raw of p.text.split(/\n/)){
    const line=raw.replace(/\s+/g,' ').trim();
@@ -141,12 +141,27 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
 }
 
 async function getSource(url:URL){
- const response=await fetch(url.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(15000),cache:'no-store'});
+ let response:Response;
+ try{
+  response=await fetch(url.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(20000),cache:'no-store'});
+ }catch(error){
+  const message=error instanceof Error?error.message:String(error||'falha desconhecida');
+  const cause=(error as any)?.cause;
+  console.error('[Futurador][Fonte] Falha ao conectar à fonte oficial',JSON.stringify({url:url.toString(),message,cause:cause?{code:cause.code,message:cause.message}:null}));
+  throw new Error('O servidor da fonte oficial não respondeu à conexão. Tente novamente ou abra o edital no site oficial para confirmar que ele está disponível.');
+ }
  if(response.status>=300&&response.status<400){
   const location=response.headers.get('location');
   const next=location?safeUrl(new URL(location,url).toString()):null;
   if(!next)throw new Error('A fonte redirecionou para um endereço não permitido.');
-  const second=await fetch(next.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(15000),cache:'no-store'});
+  let second:Response;
+  try{
+   second=await fetch(next.toString(),{headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html,application/pdf,*/*'},redirect:'manual',signal:AbortSignal.timeout(20000),cache:'no-store'});
+  }catch(error){
+   const message=error instanceof Error?error.message:String(error||'falha desconhecida');
+   console.error('[Futurador][Fonte] Falha após redirecionamento',JSON.stringify({url:next.toString(),message}));
+   throw new Error('O endereço oficial redirecionou para um servidor que não respondeu. Confira o documento diretamente no site da banca.');
+  }
   if(second.status>=300&&second.status<400)throw new Error('A fonte possui redirecionamentos adicionais que não podem ser validados.');
   if(!second.ok)throw new Error('Não foi possível acessar o documento selecionado (HTTP '+second.status+').');
   return {response:second,url:next};
@@ -170,7 +185,21 @@ export async function POST(req:Request){
     initialUrl.pathname.replace(/\/+$/, '') === '/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm'
       ? new URL('https://concursos.policiamilitar.sp.gov.br/wp-content/uploads/2026/11/10.-Minuta-do-Edital-no-DP-4.321.26_-versao-final-site-PM-e-VUNESP.pdf')
       : initialUrl;
-  let {response:source,url:sourceUrl}=await getSource(sourceUrlToFetch);
+  let fetchedSource:{response:Response;url:URL};
+  try{
+   fetchedSource=await getSource(sourceUrlToFetch);
+  }catch(primaryError){
+   // Se o PDF direto da PMESP estiver temporariamente inacessível ao servidor,
+   // tenta a própria página oficial do concurso. Ela continua sendo fonte oficial
+   // e permite informar a limitação sem exibir o erro técnico "fetch failed".
+   if(sourceUrlToFetch.toString()!==initialUrl.toString()){
+    console.warn('[Futurador][Fonte] PDF direto indisponível; tentando a página oficial',JSON.stringify({pdf:sourceUrlToFetch.toString()}));
+    fetchedSource=await getSource(initialUrl);
+   }else{
+    throw primaryError;
+   }
+  }
+  let {response:source,url:sourceUrl}=fetchedSource;
   let buffer=await source.arrayBuffer();
   if(buffer.byteLength>15*1024*1024)return NextResponse.json({error:'O documento ultrapassa o limite de 15 MB para análise automática.'},{status:413});
   let type=(source.headers.get('content-type')||'').toLowerCase();
@@ -330,9 +359,14 @@ Documento efetivamente analisado: ${evidenceUrl}`});
   if(!subjects.length||subjects.every((s:any)=>!s.topics.length))warnings.push('Nenhum tópico programático foi extraído. O Futurador deve impedir a geração de um cronograma baseado em conteúdo vazio.');
   return NextResponse.json({sourceUrl:initialUrl.toString(),documentUrl:evidenceUrl,sourceType,documentType,isOfficialNotice,aiModel:usedModel,examName:typeof data.examName==='string'?data.examName:null,institution:typeof data.institution==='string'?data.institution:null,organizer:typeof data.organizer==='string'?data.organizer:null,examDate:typeof data.examDate==='string'?data.examDate:null,positions,subjects,officialSource:data.officialSource===true,warnings});
  }catch(e){
-  const message=e instanceof Error?e.message:'';
+  const message=e instanceof Error?e.message:String(e||'falha desconhecida');
+  const cause=(e as any)?.cause;
+  console.error('[Futurador][Análise] Falha ao processar fonte',JSON.stringify({message,name:e instanceof Error?e.name:null,cause:cause?{code:cause.code,message:cause.message}:null}));
   if(e instanceof Error&&(e.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
-   return NextResponse.json({error:'O Google demorou mais que o limite de espera para analisar este edital. O Futurador já priorizou as páginas relevantes do PDF; tente novamente em alguns minutos. Nenhuma cobrança foi ativada.'},{status:504});
+   return NextResponse.json({error:'O servidor demorou para responder ao analisar este edital. Tente novamente em alguns minutos. Nenhuma cobrança foi ativada.'},{status:504});
+  }
+  if(/fetch failed|network|ECONNRESET|ENOTFOUND|EAI_AGAIN|socket hang up/i.test(message)){
+   return NextResponse.json({error:'Não foi possível conectar ao servidor do edital oficial neste momento. Abra a fonte oficial para confirmar que o documento está disponível e tente novamente em instantes.'},{status:502});
   }
   return NextResponse.json({error:message||'Não foi possível analisar a fonte.'},{status:502});
  }
