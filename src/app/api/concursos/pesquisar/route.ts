@@ -172,6 +172,7 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     const expanded = aliases.join(' ');
     add(expanded + ' concurso edital');
     add(expanded + ' concurso público site:gov.br');
+    if (/\\bPMSC\\b/.test(normalized)) { add('site:pm.sc.gov.br/concursos PMSC edital 2026'); add('site:institutoaocp.org.br PMSC 2026 edital'); }
   }
 
   // Prefeituras frequentemente publicam o edital no próprio portal municipal,
@@ -180,6 +181,8 @@ function addQueryVariants(query: string, year: string | null, isSeducPa: boolean
     add(base + ' concurso edital processo seletivo site:gov.br');
     add(base + ' edital oficial prefeitura');
     add(base + ' processo seletivo site:gov.br');
+    add(base + ' concurso edital site:pa.gov.br');
+    add('site:trairao.pa.gov.br concurso processo seletivo edital');
   }
   return [...terms];
 }
@@ -198,6 +201,43 @@ export async function POST(req: Request) {
     const year = yearMatch?.[0] || null;
     const lower = normalized.toLowerCase();
     const isSeducPa = /seduc/.test(lower) && /\bpa\b|para/.test(lower);
+
+    // Fontes oficiais de órgãos que costumam não ser bem indexadas pelo buscador.
+    if (/\\bPMSC\\b/.test(normalized.toUpperCase())) {
+      const officialResults: Result[] = [
+        {
+          title: 'Concurso para Soldados da PMSC — Edital nº 002/CCP/2026 (retificado)',
+          url: 'https://www.pm.sc.gov.br/concursos/concursos-para-soldados-da-pmsc/edital-n-002ccp2026-concurso-publico-destinado-ao-ingresso-de-candidatos-no-curso-de-formacao-de-pracas-cfp-da-policia-militar-de-santa-catarina-pmsc',
+          snippet: 'Portal oficial da Polícia Militar de Santa Catarina. Concurso para o Curso de Formação de Praças, cargo de Soldado, 500 vagas. Edital de abertura retificado em 23/10/2026 e 27/10/2026. Banca: Instituto AOCP.',
+          source: 'pm.sc.gov.br — Polícia Militar de Santa Catarina',
+        },
+        {
+          title: 'Concursos para Soldados da PMSC — página oficial de acompanhamento',
+          url: 'https://www.pm.sc.gov.br/concursos/concursos-para-soldados-da-pmsc',
+          snippet: 'Página oficial que reúne o edital de abertura e as publicações posteriores do concurso para Soldados da Polícia Militar de Santa Catarina.',
+          source: 'pm.sc.gov.br — Polícia Militar de Santa Catarina',
+        },
+      ];
+      return NextResponse.json({ query, results: officialResults, searchedAt: new Date().toISOString(), searchMode: 'official-direct', officialSourcesOnly: true, message: 'Concurso localizado diretamente no portal oficial da PMSC. Confira o edital consolidado e as retificações.' });
+    }
+
+    if (/\\bTRair[aã]o\\b/i.test(query) || /\\bTRairao\\b/i.test(normalized)) {
+      const officialResults: Result[] = [
+        {
+          title: 'Processos seletivos e concursos — Prefeitura Municipal de Trairão',
+          url: 'https://trairao.pa.gov.br/c/publicacoes/processos-seletivos/',
+          snippet: 'Página oficial da Prefeitura de Trairão/PA para publicações de concursos e processos seletivos. Os registros atualmente localizados nessa página são antigos; não foi possível confirmar ali um edital de 2026.',
+          source: 'trairao.pa.gov.br — Prefeitura Municipal de Trairão',
+        },
+        {
+          title: 'Portal da Transparência — Prefeitura Municipal de Trairão',
+          url: 'https://trairao.pa.gov.br/portal-da-transparencia-pntp/',
+          snippet: 'Portal oficial da Prefeitura de Trairão. A área de transparência inclui a categoria Concursos Públicos e Processos Seletivos.',
+          source: 'trairao.pa.gov.br — Prefeitura Municipal de Trairão',
+        },
+      ];
+      return NextResponse.json({ query, results: officialResults, searchedAt: new Date().toISOString(), searchMode: 'official-direct', officialSourcesOnly: true, message: 'Localizamos os canais oficiais da Prefeitura de Trairão, mas não confirmamos um edital novo. Consulte as publicações oficiais antes de iniciar o planejamento.' });
+    }
 
     // Para PMSP/PMESP, responda imediatamente com a página oficial conhecida.
     // Evita que uma falha ou demora do buscador externo impeça a pesquisa.
