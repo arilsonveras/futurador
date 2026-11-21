@@ -56,6 +56,7 @@ export default function FullScreenLoader({
   const steps = messages[mode];
 
   useEffect(() => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setStep(0);
     setProgress(6);
     const messageTimer = window.setInterval(() => {
