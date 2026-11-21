@@ -143,7 +143,8 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
 
 function isPmespOfficialNotice(url:URL){
  return (url.hostname==='concursos.policiamilitar.sp.gov.br' &&
-   /\/concursos\/edital-dp-4-321-26-concurso-para-aluno-soldado-pm\/?$/.test(url.pathname)) ||
+   (/\/concursos\/edital-dp-4-321-26-concurso-para-aluno-soldado-pm\/?$/.test(url.pathname) ||
+    /\/wp-content\/uploads\/2026\/11\/10\.-Minuta-do-Edital-no-DP-4\.321\.26/i.test(url.pathname))) ||
   (url.hostname==='doe.sp.gov.br' &&
    /edital-de-concurso-publico-n-dp-4-321-26-202611041336161962254080/.test(url.pathname));
 }
