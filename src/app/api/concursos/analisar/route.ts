@@ -267,6 +267,56 @@ function discoverOfficialPdfCandidates(html:string,baseUrl:URL){
  for(const m of html.matchAll(/["']([^"'<>]{5,500}\.pdf[^"'<>]*)["']/gi))add(m[1],'referência PDF em script');
  return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,20);
 }
+async function discoverOfficialPdfsBySearch(baseUrl:URL,html:string){
+ const title=html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()||'';
+ const pageText=htmlText(html).slice(0,1800);
+ const context=(title+' '+pageText+' '+baseUrl.pathname).replace(/\s+/g,' ').trim().slice(0,420);
+ const queries=[
+  'site:'+baseUrl.hostname+' '+context+' edital abertura PDF',
+  'site:'+officialSiteRoot(baseUrl.hostname)+' '+context+' edital PDF'
+ ];
+ const found=new Map<string,{url:URL;score:number}>();
+ for(const query of [...new Set(queries)]){
+  try{
+   const response=await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent(query),{
+    headers:{'User-Agent':'Mozilla/5.0 (compatible; Futurador/1.0)','Accept':'text/html'},
+    signal:AbortSignal.timeout(9000),cache:'no-store'
+   });
+   if(!response.ok)continue;
+   const searchHtml=await response.text();
+   for(const match of searchHtml.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
+    const attrs=match[1]||'';
+    if(!/result__a/i.test(attrs))continue;
+    const raw=attrs.match(/href\s*=\s*["']([^"']+)["']/i)?.[1];
+    if(!raw)continue;
+    let parsed:URL;try{const wrapped=new URL(raw,'https://duckduckgo.com');parsed=new URL(wrapped.searchParams.get('uddg')||wrapped.toString());}catch{continue;}
+    if(parsed.protocol!=='https:'||officialSiteRoot(parsed.hostname)!==officialSiteRoot(baseUrl.hostname))continue;
+    const descriptor=(match[2]+' '+parsed.pathname).replace(/<[^>]+>/g,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(!/\.pdf(?:$|[?#])|pdf/.test(descriptor))continue;
+    if(/demanda|candidat.{0,12}vaga|resultado|classificacao|gabarito|convocacao|homologacao|local.{0,10}prova/.test(descriptor))continue;
+    const score=(/\.pdf(?:$|[?#])/.test(parsed.pathname.toLowerCase())?100:0)+(/abertura|edital.?n.?1|ed_?1_/.test(descriptor)?80:0);
+    found.set(parsed.toString(),{url:parsed,score});
+   }
+  }catch(error){
+   console.warn('[Futurador][Busca oficial] Não foi possível consultar o índice',error instanceof Error?error.message:'erro');
+  }
+  if(found.size>=8)break;
+ }
+ const candidates=[...found.values()].sort((a,b)=>b.score-a.score).slice(0,6);
+ for(const candidate of candidates){
+  try{
+   const fetched=await getSource(candidate.url);
+   const type=(fetched.response.headers.get('content-type')||'').toLowerCase();
+   const bytes=await fetched.response.arrayBuffer();
+   const signature=new TextDecoder().decode(bytes.slice(0,5));
+   if(bytes.byteLength>0&&bytes.byteLength<=15*1024*1024&&(type.includes('pdf')||fetched.url.pathname.toLowerCase().endsWith('.pdf')||signature.startsWith('%PDF-')))return {buffer:bytes,url:fetched.url};
+  }catch(error){
+   console.warn('[Futurador][Busca oficial] PDF indexado indisponível',JSON.stringify({url:candidate.url.toString(),message:error instanceof Error?error.message:'erro'}));
+  }
+ }
+ return null;
+}
+
 async function findPdfInOfficialPage(html:string,baseUrl:URL){
  const candidates=discoverOfficialPdfCandidates(html,baseUrl).slice(0,8);
  for(const candidate of candidates){
@@ -410,7 +460,7 @@ export async function POST(req:Request){
    // Descoberta genérica de PDFs na fonte oficial: links, atributos de download,
    // URLs em scripts/JSON e subdomínios oficiais de CDN da mesma banca/órgão.
    if(sourceType!=='pdf'){
-    const discovered=await findPdfInOfficialPage(html,sourceUrl);
+    const discovered=await findPdfInOfficialPage(html,sourceUrl) || await discoverOfficialPdfsBySearch(sourceUrl,html);
     if(discovered){
      buffer=discovered.buffer;sourceUrl=discovered.url;sourceType='pdf';evidenceUrl=sourceUrl.toString();
      try{
