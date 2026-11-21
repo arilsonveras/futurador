@@ -77,7 +77,7 @@ export default function FullScreenLoader({
   const currentMessage = message || steps[step];
   const displayedProgress = Math.round(progress);
   return (
-    <div className="fullscreen-loader" role="status" aria-live="polite" aria-label={currentMessage}>
+    <div className="fullscreen-loader" role="dialog" aria-modal="true" aria-live="polite" aria-label={currentMessage}>
       <div className="fullscreen-loader-card">
         <div className="loader-orbit"><span /><span /><span /></div>
         <strong>Futurador</strong>
