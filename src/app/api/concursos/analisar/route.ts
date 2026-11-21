@@ -276,13 +276,13 @@ Documento efetivamente analisado: ${evidenceUrl}`});
     try{
      response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:requestBody,signal:AbortSignal.timeout(timeout)});
     }catch(error){
-     const message=error instanceof Error?error.message:'';
-     if(error instanceof Error&&(error.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message))){
-      console.error('[Futurador][Gemini] Tempo esgotado',JSON.stringify({model:model.name,timeoutMs:timeout,attempt:attempt+1}));
-      response=null;
-      break;
-     }
-     throw error;
+     const message=error instanceof Error?error.message:String(error||'erro desconhecido');
+     const timedOut=error instanceof Error&&(error.name==='TimeoutError'||/aborted due to timeout|timed out/i.test(message));
+     console.error(timedOut?'[Futurador][Gemini] Tempo esgotado':'[Futurador][Gemini] Falha de conexão; usando extração local',JSON.stringify({model:model.name,timeoutMs:timeout,attempt:attempt+1,message:message.slice(0,500)}));
+     // Falhas de rede do provedor não podem derrubar a análise inteira.
+     // A extração local continua disponível e será devolvida com avisos de conferência.
+     response=null;
+     break;
     }
     if(response.ok){usedModel=model.name;break;}
     const details=await response.clone().json().catch(()=>null);
