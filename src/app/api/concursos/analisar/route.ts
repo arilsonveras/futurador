@@ -268,7 +268,7 @@ function discoverOfficialPdfCandidates(html:string,baseUrl:URL){
  return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,20);
 }
 async function findPdfInOfficialPage(html:string,baseUrl:URL){
- const candidates=discoverOfficialPdfCandidates(html,baseUrl);
+ const candidates=discoverOfficialPdfCandidates(html,baseUrl).slice(0,8);
  for(const candidate of candidates){
   try{
    const fetched=await getSource(candidate.url);
