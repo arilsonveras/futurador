@@ -64,7 +64,7 @@ function isOfficialExamBoardUrl(rawUrl: string) {
 // Isso é comum em concursos de polícias, prefeituras, secretarias e tribunais.
 function isOfficialPublicBodyUrl(rawUrl: string) {
   try {
-    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\\./, '');
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '');
     return host.endsWith('.gov.br') || host.endsWith('.leg.br') ||
       host.endsWith('.jus.br') || host.endsWith('.mil.br');
   } catch {
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
     // Fontes oficiais conhecidas entram diretamente no resultado para que a
     // busca não dependa exclusivamente da indexação/retorno do mecanismo externo.
     const normalizedUpper = normalized.toUpperCase();
-    if (/\\bPMSP\\b|\\bPMESP\\b/.test(normalizedUpper)) {
+    if (/\bPMSP\b|\bPMESP\b/.test(normalizedUpper)) {
       const url = 'https://concursos.policiamilitar.sp.gov.br/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm/';
       unique.set(url, {
         title: 'Edital DP-4/321/26 – Concurso para Aluno-Soldado PM',
