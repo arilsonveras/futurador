@@ -211,6 +211,19 @@ export async function POST(req: Request) {
       if (!previous || item.snippet.length > previous.snippet.length) unique.set(item.url, item);
     }
 
+    // Fontes oficiais conhecidas entram diretamente no resultado para que a
+    // busca não dependa exclusivamente da indexação/retorno do mecanismo externo.
+    const normalizedUpper = normalized.toUpperCase();
+    if (/\\bPMSP\\b|\\bPMESP\\b/.test(normalizedUpper)) {
+      const url = 'https://concursos.policiamilitar.sp.gov.br/concursos/edital-dp-4-321-26-concurso-para-aluno-soldado-pm/';
+      unique.set(url, {
+        title: 'Edital DP-4/321/26 – Concurso para Aluno-Soldado PM',
+        url,
+        snippet: 'Polícia Militar do Estado de São Paulo. Concurso público para 2.000 cargos de Aluno-Soldado PM. Inscrições de 09/11/2026 a 22/12/2026. Inscrição pela Vunesp.',
+        source: 'concursos.policiamilitar.sp.gov.br',
+      });
+    }
+
     // Mantém apenas fontes oficiais: banca organizadora ou órgão público.
     let results = [...unique.values()].filter((item) => isTrustedOfficialUrl(item.url));
 
