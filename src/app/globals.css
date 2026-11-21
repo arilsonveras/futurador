@@ -148,3 +148,35 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid rgba(
  .source-card,.role-row,.steps-grid article,.search-submit{transition:none}
  .source-card:hover,.role-row:hover,.steps-grid article:hover,.search-submit:hover{transform:none}
 }
+
+
+/* Orientação de uso: etapas visíveis e exemplos de pesquisa */
+.journey-guide{max-width:900px;margin:10px auto 0;padding:15px 18px 13px;border:1px solid #e4eadc;border-radius:14px;background:rgba(255,255,255,.82)}
+.journey-guide-head{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#718075;font-size:9px;font-weight:900;letter-spacing:1px}
+.journey-guide-head b{color:#52713a;font-size:10px;letter-spacing:0;white-space:nowrap}
+.journey-track{height:4px;margin:10px 0 13px;overflow:hidden;border-radius:10px;background:#edf1e9}
+.journey-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#174b3a,#a9cb4c);transition:width .25s ease}
+.journey-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.journey-step{display:flex;align-items:center;gap:8px;min-width:0;color:#a0aaa0}
+.journey-step>span{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border:1px solid #dfe6d9;border-radius:50%;font-size:10px;font-weight:800}
+.journey-step>div{display:grid;gap:2px;min-width:0}
+.journey-step b{overflow:hidden;color:#78857a;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.journey-step small{overflow:hidden;color:#9aa49a;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.journey-step.current>span,.journey-step.done>span{border-color:#739342;background:#739342;color:white}
+.journey-step.current b,.journey-step.done b{color:#31583e}
+.quick-searches{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:12px 0 2px}
+.quick-searches>span{color:#829087;font-size:10px}
+.quick-searches button{border:1px solid #e0e8d8;border-radius:20px;background:#f8faf5;padding:6px 10px;color:#55713d;font-size:10px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s}
+.quick-searches button:hover{border-color:#a9c28a;background:#edf4e4}
+@media(max-width:600px){
+ .journey-guide{margin-top:6px;padding:12px 11px}
+ .journey-steps{gap:4px}
+ .journey-step{align-items:flex-start;flex-direction:column;gap:5px}
+ .journey-step>span{flex-basis:22px;width:22px;height:22px}
+ .journey-step b{font-size:9px}
+ .journey-step small{display:none}
+ .quick-searches{gap:6px}
+ .quick-searches>span{width:100%}
+ .quick-searches button{padding:7px 9px;font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.journey-track i,.quick-searches button{transition:none}}
