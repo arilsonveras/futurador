@@ -97,7 +97,7 @@ function localEditalExtraction(pages:string[],sourceUrl:string,sourceType:string
  const institutionLine=all.slice(0,15).flatMap(p=>p.text.split(/\n/)).find(line=>/secretaria|prefeitura|universidade|tribunal|estado do|municipio de/i.test(line));
  const positions:any[]=[];
  const seenPositions=new Set<string>();
- const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
+ const rolePattern=/^(?:\d+(?:\.\d+)*[.)]?\s*)?(?:aluno[- ]soldado(?:\\s+pm)?|soldado(?:\\s+pm)?|professor(?:\s+classe\s+[ivx]+)?(?:\s*[-–—:]\s*|\s+de\s+)?[^.;]{2,90}|especialista em educacao[^.;]{0,90}|analista(?:\s+[^.;]{2,90})?|tecnico(?:\s+[^.;]{2,90})?|assistente(?:\s+[^.;]{2,90})?|auxiliar(?:\s+[^.;]{2,90})?|engenheiro(?:\s+[^.;]{2,90})?|contador|psicologo|assistente social|secretario escolar)$/i;
  const vacancyPages=all.filter(p=>/quadro de vagas|vagas imediatas|cadastro de reserva|cargo.{0,30}vagas|distribuicao das vagas|aluno[- ]soldado/.test(p.normalized)).slice(0,12);
  for(const p of vacancyPages){
   for(const raw of p.text.split(/\n/)){
