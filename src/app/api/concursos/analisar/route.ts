@@ -237,6 +237,52 @@ function pmpaOfficialFallback(sourceUrl:string){
  };
 }
 
+
+function officialSiteRoot(hostname:string){
+ const host=hostname.toLowerCase().replace(/^www\./,'').split('.');
+ const suffix=host.slice(-2).join('.');
+ const multiSuffix=['com.br','org.br','gov.br','edu.br','mil.br','net.br'];
+ return multiSuffix.includes(suffix)&&host.length>=3?host.slice(-3).join('.'):host.slice(-2).join('.');
+}
+function discoverOfficialPdfCandidates(html:string,baseUrl:URL){
+ const found=new Map<string,{url:URL;label:string;score:number}>();
+ const add=(raw:string,label:string)=>{
+  const decoded=raw.replace(/\\\//g,'/').replace(/&amp;/g,'&').replace(/\\u0026/g,'&').trim();
+  if(!decoded||decoded.startsWith('javascript:')||decoded.startsWith('data:'))return;
+  let url:URL;try{url=new URL(decoded,baseUrl);}catch{return;}
+  if(url.protocol!=='https:'||url.username||url.password)return;
+  if(officialSiteRoot(url.hostname)!==officialSiteRoot(baseUrl.hostname))return;
+  const path=(url.pathname+' '+url.search).toLowerCase();
+  const desc=(label+' '+url.pathname).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(!/\.pdf(?:$|[?#])|pdf|download|arquivo|edital/.test(path+' '+desc))return;
+  if(/demanda|candidat.{0,12}vaga|resultado|classificacao|gabarito|convocacao|homologacao|local.{0,10}prova/.test(desc))return;
+  const isPdf=/\.pdf(?:$|[?#])|application\/pdf/.test(path);
+  const isOpening=/edital.{0,25}abertura|abertura.{0,25}edital|ed_?1_|edital.?n.?1/.test(desc);
+  const score=(isPdf?100:0)+(isOpening?80:0)+(/edital|retifica/.test(desc)?30:0);
+  const key=url.toString(),old=found.get(key);
+  if(!old||score>old.score)found.set(key,{url,label,score});
+ };
+ for(const m of html.matchAll(/(?:href|src|data-href|data-url|data-file|data-download|content)\s*=\s*["']([^"']+)["']/gi))add(m[1],m[0]);
+ for(const m of html.matchAll(/https?:\/\/[^"'\s<>]+/gi))add(m[0].replace(/\\\//g,'/'),'URL incorporada');
+ for(const m of html.matchAll(/["']([^"'<>]{5,500}\.pdf[^"'<>]*)["']/gi))add(m[1],'referência PDF em script');
+ return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,20);
+}
+async function findPdfInOfficialPage(html:string,baseUrl:URL){
+ const candidates=discoverOfficialPdfCandidates(html,baseUrl);
+ for(const candidate of candidates){
+  try{
+   const fetched=await getSource(candidate.url);
+   const contentType=(fetched.response.headers.get('content-type')||'').toLowerCase();
+   const bytes=await fetched.response.arrayBuffer();
+   const signature=new TextDecoder().decode(bytes.slice(0,5));
+   if(bytes.byteLength>0&&bytes.byteLength<=15*1024*1024&&(contentType.includes('pdf')||fetched.url.pathname.toLowerCase().endsWith('.pdf')||signature.startsWith('%PDF-')))return {buffer:bytes,url:fetched.url};
+  }catch(error){
+   console.warn('[Futurador][Descoberta] Link oficial não acessível',JSON.stringify({url:candidate.url.toString(),message:error instanceof Error?error.message:'erro'}));
+  }
+ }
+ return null;
+}
+
 async function getSource(url:URL){
  let response:Response;
  try{
@@ -361,8 +407,24 @@ export async function POST(req:Request){
      }
     }catch{/* mantém a página como fonte e informa a limitação no prompt */}
    }
+   // Descoberta genérica de PDFs na fonte oficial: links, atributos de download,
+   // URLs em scripts/JSON e subdomínios oficiais de CDN da mesma banca/órgão.
    if(sourceType!=='pdf'){
-    if(pageText.length<500)return NextResponse.json({error:'A página não contém texto suficiente. Procure o link direto do edital em PDF ou outra fonte oficial.'},{status:422});
+    const discovered=await findPdfInOfficialPage(html,sourceUrl);
+    if(discovered){
+     buffer=discovered.buffer;sourceUrl=discovered.url;sourceType='pdf';evidenceUrl=sourceUrl.toString();
+     try{
+      const extracted=await extractRelevantPdfText(buffer);
+      localPages=extracted.pages;
+      parts=[{text:'EDITAL PDF LOCALIZADO AUTOMATICAMENTE NA FONTE OFICIAL. Foram identificadas '+extracted.pageCount+' páginas. Preserve os números das páginas nas evidências.\n\n'+extracted.text}];
+     }catch(error){
+      console.error('[Futurador][PDF] Falha na extração local do PDF descoberto',error instanceof Error?error.message:'erro desconhecido');
+      parts=[{inline_data:{mime_type:'application/pdf',data:Buffer.from(buffer).toString('base64')}}];
+     }
+    }
+   }
+   if(sourceType!=='pdf'){
+    if(pageText.length<500)return NextResponse.json({error:'A página oficial não disponibilizou texto nem um PDF identificável automaticamente. Tente abrir a área de editais da banca ou informe o link direto do documento. Nenhum conteúdo foi inventado.'},{status:422});
     parts=[{text:'PÁGINA OFICIAL E LISTA DE DOCUMENTOS:\n'+pageText+'\n\nLINKS DOS ARQUIVOS:\n'+anchors.map(a=>a.label+' — '+a.href).filter(x=>x.trim()).slice(0,100).join('\n')}];
    }
   }
