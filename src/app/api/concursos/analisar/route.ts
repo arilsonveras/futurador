@@ -176,6 +176,67 @@ function pmespOfficialFallback(sourceUrl:string){
  };
 }
 
+function isPmpaOfficialNotice(url:URL){
+ return (url.hostname==='www.cebraspe.org.br' || url.hostname==='cebraspe.org.br') &&
+   /\\/concursos\\/PM_PA_23_CFP\\/?$/i.test(url.pathname) ||
+  url.hostname==='cdn.cebraspe.org.br' && /\\/concursos\\/PM_PA_23_CFP\\/arquivos\\/.*PMPA_CFP.*\\.PDF$/i.test(url.pathname);
+}
+function pmpaOfficialFallback(sourceUrl:string){
+ const pdfUrl='https://cdn.cebraspe.org.br/concursos/PM_PA_23_CFP/arquivos/ED_1_PMPA_CFP_ABERTURA.PDF';
+ const role='Praça da Polícia Militar do Estado do Pará (Soldado PM)';
+ const make=(name:string,topics:string[],module='basic')=>({name,positionNames:[role],scope:'specific',module,topics,evidence:'Edital nº 1 — CFP/PMPA/2023, Anexo II — Objetos de Avaliação.'});
+ const subjects=[
+  make('Língua Portuguesa',[
+   'Compreensão e interpretação de textos de gêneros variados.','Reconhecimento de tipos e gêneros textuais.','Domínio da ortografia oficial.','Domínio dos mecanismos de coesão textual.','Emprego de elementos de referenciação, substituição e repetição, de conectores e de outros elementos de sequenciação textual.','Emprego de tempos e modos verbais.','Domínio da estrutura morfossintática do período.','Emprego das classes de palavras.','Relações de coordenação entre orações e entre termos da oração.','Relações de subordinação entre orações e entre termos da oração.','Emprego dos sinais de pontuação.','Concordância verbal e nominal.','Regência verbal e nominal.','Emprego do sinal indicativo de crase.','Colocação dos pronomes átonos.','Reescrita de frases e parágrafos do texto.','Significação das palavras.','Substituição de palavras ou de trechos de texto.','Reorganização da estrutura de orações e de períodos do texto.','Reescrita de textos de diferentes gêneros e níveis de formalidade.'
+  ]),
+  make('Informática',[
+   'Conceitos de Internet e intranet.','Conceitos básicos e modos de utilização de tecnologias, ferramentas, aplicativos e procedimentos de informática.','Conceitos e modos de utilização de aplicativos para edição de textos, planilhas e apresentações com LibreOffice.','Conceitos e modos de utilização do sistema operacional Windows 10.','Noções básicas de ferramentas e aplicativos de navegação e correio eletrônico.','Noções básicas de segurança e proteção: vírus, worms e derivados.'
+  ]),
+  make('Raciocínio Lógico',[
+   'Conceitos básicos de raciocínio lógico: proposições e valores lógicos.','Sentenças abertas e número de linhas da tabela-verdade.','Conectivos e proposições simples e compostas.','Tautologia e contradição.','Operações com conjuntos.','Cálculos com porcentagens.'
+  ]),
+  make('Noções de Direito Constitucional',[
+   'Constituição da República Federativa do Brasil de 1988.','Princípios fundamentais.','Aplicabilidade das normas constitucionais.','Direitos e garantias fundamentais: direitos e deveres individuais e coletivos, direitos sociais, nacionalidade, direitos políticos e partidos políticos.','Organização do Estado e organização político-administrativa.','União, estados federados, municípios, Distrito Federal e territórios.','Administração pública: disposições gerais, servidores públicos e militares dos estados, do Distrito Federal e dos territórios.','Defesa do Estado e das instituições democráticas: estado de defesa, estado de sítio e segurança pública.'
+  ],'specific'),
+  make('Noções de Direito Administrativo',[
+   'Conceito, fontes e princípios do Direito Administrativo.','Estado, governo e administração pública.','Administração direta e indireta.','Agentes públicos: conceito, função e classificação.','Cargo público, emprego público e função pública.','Responsabilidade civil, criminal e administrativa.','Poderes administrativos: hierárquico, disciplinar, regulamentar e de polícia; uso e abuso do poder.','Ato administrativo: conceito, atributos, elementos, vícios, classificação, extinção, saneamento, exteriorização, validade e eficácia, vinculação e discricionariedade.'
+  ],'specific'),
+  make('Noções de Direito Penal',[
+   'Aplicação da lei penal: princípios da legalidade e da anterioridade.','Lei penal no tempo e no espaço.','Tempo e lugar do crime.','Lei penal excepcional, especial e temporária.','Territorialidade e extraterritorialidade da lei penal.','Fato típico e seus elementos.','Crime consumado e tentado; pena da tentativa.','Desistência voluntária, arrependimento eficaz e arrependimento posterior.','Concurso de crimes.','Ilicitude e causas de exclusão; excesso punível.','Culpabilidade: elementos e causas de exclusão.','Imputabilidade penal.','Concurso de pessoas.','Crimes contra a pessoa, o patrimônio, a dignidade sexual, a paz pública, a fé pública e a Administração Pública.'
+  ],'specific'),
+  make('Noções de Direito Processual Penal',[
+   'Processo penal brasileiro e processo penal constitucional.','Sistemas e princípios fundamentais.','Aplicação da lei processual no tempo, no espaço e em relação às pessoas.','Disposições preliminares do Código de Processo Penal.','Fase pré-processual: inquérito policial.','Prova.','Termo circunstanciado da ocorrência (TCO).','Prisão em flagrante.'
+  ],'specific'),
+  make('Noções de Direito Penal Militar',[
+   'Aplicação da lei penal militar.','Crime e imputabilidade penal.','Concurso de agentes.','Penas principais e acessórias; aplicação da pena.','Efeitos da condenação.','Medidas de segurança.','Ação penal e extinção da punibilidade.','Crimes militares em tempo de paz.','Crimes propriamente militares, impropriamente militares e crimes militares por extensão.'
+  ],'specific'),
+  make('Noções de Direito Processual Penal Militar',[
+   'Processo Penal Militar e sua aplicação.','Polícia judiciária militar.','Inquérito policial militar.','Ação penal militar e seu exercício.','Prisão em flagrante e prisão preventiva.','Menagem e liberdade provisória.','Aplicação provisória de medidas de segurança.','Processos especiais: deserção de praça e de praça especial; insumissão.','Composição do Conselho Permanente de Justiça e do Conselho Especial de Justiça.'
+  ],'specific'),
+  make('Legislação Penal Extravagante',[
+   'Lei nº 8.072/1990 — Lei de Crimes Hediondos.','Lei nº 11.343/2006 — Lei de Drogas.','Lei nº 13.869/2019 — Lei de Abuso de Autoridade.','Lei nº 7.716/1989 — crimes resultantes de preconceito de raça ou de cor.','Lei nº 8.069/1990 — prática e apuração de ato infracional e crimes em espécie.','Lei nº 9.503/1997 — Crimes de Trânsito.','Lei nº 9.455/1997 — Lei de Tortura.','Lei nº 10.826/2003 — Estatuto do Desarmamento.','Lei nº 9.605/1998 — Lei de Crimes Ambientais.','Lei nº 11.340/2006 — Lei Maria da Penha.'
+  ],'specific'),
+  make('Legislação Institucional',[
+   'Lei Estadual nº 5.251/1985 — Estatuto dos Policiais Militares do Estado do Pará e alterações.','Lei Estadual nº 8.230/2015 — promoção dos Praças da Polícia Militar do Pará e alterações.','Lei Complementar Estadual nº 142/2021 — Sistema de Proteção Social dos Militares do Estado do Pará e alterações.','Lei Complementar Estadual nº 53/2006 — organização básica e efetivo da Polícia Militar do Pará e alterações.','Lei Estadual nº 9.954/2023 — valores dos soldos dos círculos de Praças e de Praças Especiais.','Lei Estadual nº 9.500/2022 e alterações.','Lei Estadual nº 6.626/2004 — ingresso na Polícia Militar do Pará e alterações.','Lei Estadual nº 6.833/2006 — Código de Ética e Disciplina da Polícia Militar do Pará.'
+  ],'specific'),
+  make('Noções de Direitos Humanos',[
+   'Teoria geral dos direitos humanos: conceitos, terminologia, estrutura normativa e fundamentação.','Afirmação histórica dos direitos humanos.','Direitos humanos e responsabilidade do Estado.','Direitos humanos na Constituição Federal.','Política Nacional de Direitos Humanos.','Constituição brasileira e tratados internacionais de direitos humanos.'
+  ],'specific')
+ ];
+ return {
+  documentType:'edital_abertura',isOfficialNotice:true,examName:'Concurso Público CFP/PMPA 2023 — Edital nº 1, de 19 de setembro de 2023',
+  institution:'Polícia Militar do Estado do Pará / SEPLAD',organizer:'Cebraspe',
+  examDate:'2023-12-17',
+  positions:[{name:role,category:'Segurança Pública',formation:'Ensino médio',educationLevel:'Ensino médio',vacancies:4000,immediateVacancies:4000,reserveList:false,evidence:'Edital nº 1 — CFP/PMPA/2023, itens 2.2, 3.1 e 5.1; 4.000 vagas.'}],
+  subjects,officialSource:true,sourceUrl,documentUrl:pdfUrl,sourceType:'official-cebraspe-pdf',
+  extractionMode:'official-verified-fallback',
+  warnings:[
+   'O Cebraspe disponibiliza o edital em PDF oficial. Esta análise usa o Edital nº 1 de abertura; houve retificações posteriores, então o conteúdo deve ser conferido com a versão consolidada e os editais de alteração antes de montar um cronograma definitivo.',
+   'O certame CFP/PMPA 2023 teve prova objetiva prevista para 17/12/2023. Trata-se de concurso anterior, exibido para estudo e consulta, não de inscrições abertas.'
+  ]
+ };
+}
+
 async function getSource(url:URL){
  let response:Response;
  try{
@@ -211,6 +272,7 @@ export async function POST(req:Request){
   const raw=typeof body?.url==='string'?body.url:'';
   const initialUrl=safeUrl(raw);
   if(!initialUrl)return NextResponse.json({error:'Endereço de fonte inválido. Use um link HTTPS público.'},{status:400});
+  if(isPmpaOfficialNotice(initialUrl))return NextResponse.json(pmpaOfficialFallback(initialUrl.toString()));
   const key=process.env.GEMINI_API_KEY;
   const aiEnabled=!!key&&process.env.FUTURADOR_AI_ENABLED==='true';
 
