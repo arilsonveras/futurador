@@ -177,9 +177,9 @@ function pmespOfficialFallback(sourceUrl:string){
 }
 
 function isPmpaOfficialNotice(url:URL){
- return (url.hostname==='www.cebraspe.org.br' || url.hostname==='cebraspe.org.br') &&
-   /\\/concursos\\/PM_PA_23_CFP\\/?$/i.test(url.pathname) ||
-  url.hostname==='cdn.cebraspe.org.br' && /\\/concursos\\/PM_PA_23_CFP\\/arquivos\\/.*PMPA_CFP.*\\.PDF$/i.test(url.pathname);
+ return ((url.hostname==='www.cebraspe.org.br' || url.hostname==='cebraspe.org.br') &&
+   /\/concursos\/PM_PA_23_CFP\/?$/i.test(url.pathname)) ||
+  (url.hostname==='cdn.cebraspe.org.br' && /\/concursos\/PM_PA_23_CFP\/arquivos\/.*PMPA_CFP.*\.PDF$/i.test(url.pathname));
 }
 function pmpaOfficialFallback(sourceUrl:string){
  const pdfUrl='https://cdn.cebraspe.org.br/concursos/PM_PA_23_CFP/arquivos/ED_1_PMPA_CFP_ABERTURA.PDF';
