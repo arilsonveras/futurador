@@ -272,7 +272,10 @@ async function discoverCebraspeOpeningPdf(baseUrl:URL){
  const contestMatch=baseUrl.pathname.match(/\/concursos\/([^/]+)/i);
  if(!contestMatch)return null;
  const slug=decodeURIComponent(contestMatch[1]).toLowerCase();
- const slugVariants=[...new Set([slug.toUpperCase(),slug.toUpperCase().replace(/-/g,'_'),slug.toUpperCase().replace(/_/g,'-')])];
+ const withoutYear=slug.replace(/_(?:19|20)?\\d{2}(?=_|$)/g,'');
+ const parts=withoutYear.split(/[_-]+/).filter(Boolean);
+ const compactPrefix=parts.length>2?parts[0]+parts[1]+'_'+parts.slice(2).join('_'):withoutYear;
+ const slugVariants=[...new Set([slug,withoutYear,compactPrefix].flatMap(value=>[value.toUpperCase(),value.toUpperCase().replace(/-/g,'_'),value.toUpperCase().replace(/_/g,'-')]))];
  const filenames=[...new Set(slugVariants.flatMap(value=>[
   'ED_1_'+value+'_ABERTURA.PDF',
   'ED_1_'+value+'_ABERTURA.pdf',
