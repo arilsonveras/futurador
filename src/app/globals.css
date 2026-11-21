@@ -180,3 +180,51 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid rgba(
  .quick-searches button{padding:7px 9px;font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.journey-track i,.quick-searches button{transition:none}}
+
+
+/* Calendário mensal de estudos */
+.dashboard-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:18px 0}
+.dashboard-heading h1{margin:0 0 5px}
+.dashboard-heading p{margin:0}
+.calendar-shell{margin:22px 0}
+.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.calendar-toolbar h2{margin:0;font-size:23px;text-transform:capitalize;letter-spacing:-.7px}
+.calendar-nav{display:flex;align-items:center;gap:8px}
+.calendar-nav button{border:1px solid #dfe7d8;border-radius:9px;background:#fff;color:#31583e;padding:9px 12px;font-weight:700;cursor:pointer}
+.calendar-nav button:hover{background:#f1f6e9}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}
+.calendar-weekday{text-align:center;color:#829087;font-size:10px;font-weight:800;padding:7px 2px}
+.calendar-day{position:relative;min-height:82px;border:1px solid #e5eadf;border-radius:10px;background:#fff;padding:9px;text-align:left;color:#26362c;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.calendar-day:hover{border-color:#a9c28a;background:#fbfdf8}
+.calendar-day.outside{opacity:.35}
+.calendar-day.selected{border-color:#789b48;background:#f1f6e9;box-shadow:0 0 0 2px rgba(120,155,72,.12)}
+.calendar-day.today .calendar-day-number{background:#174b3a;color:#fff}
+.calendar-day-number{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;font-size:12px;font-weight:800}
+.calendar-day-dots{display:flex;gap:4px;flex-wrap:wrap}
+.calendar-day-dots i{width:6px;height:6px;border-radius:50%;background:#8eae4c}
+.calendar-day-dots i.done{background:#174b3a}
+.calendar-day-count{font-size:9px;color:#6e7d75}
+.calendar-selected{margin-top:22px;padding-top:18px;border-top:1px solid #e8ede3}
+.calendar-selected h3{margin:0 0 12px;font-size:16px;text-transform:capitalize}
+.calendar-task{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid #edf0e9}
+.calendar-task:last-child{border-bottom:0}
+.calendar-task-main{display:grid;gap:4px;min-width:0}
+.calendar-task-main strong{font-size:13px}
+.calendar-task-main small{font-size:11px;color:#718075}
+.calendar-task-status{font-size:10px;font-weight:800;color:#66823f;white-space:nowrap}
+.calendar-task-status.done{color:#174b3a}
+.calendar-empty{padding:18px;border-radius:10px;background:#f8faf5;color:#7b887e;font-size:13px}
+.calendar-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;color:#718075;font-size:10px}
+.calendar-legend span{display:flex;align-items:center;gap:6px}
+.calendar-legend i{width:7px;height:7px;border-radius:50%;background:#8eae4c}
+.calendar-legend i.done{background:#174b3a}
+@media(max-width:600px){
+ .calendar-grid{gap:4px}
+ .calendar-day{min-height:58px;padding:5px;border-radius:7px;gap:4px}
+ .calendar-day-number{width:21px;height:21px;font-size:10px}
+ .calendar-day-count{font-size:8px}
+ .calendar-weekday{font-size:9px}
+ .calendar-toolbar h2{font-size:19px}
+ .calendar-nav button{padding:8px 9px}
+ .calendar-task{align-items:flex-start}
+}
