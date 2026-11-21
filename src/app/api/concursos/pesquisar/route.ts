@@ -104,6 +104,7 @@ function queryAliases(query: string) {
   if (/\bSEFAZ?\s*PA\b|\bSEFA\s*PA\b|\bSEFAZPA\b/.test(normalized)) aliases.push('Secretaria de Estado da Fazenda do Pará', 'SEFA Pará', 'SEFA-PA', 'site:sefa.pa.gov.br', 'site:pa.gov.br');
   if (/\bSEFAZ?\s*PI\b|\bSEFA\s*PI\b|\bSEFAZPI\b/.test(normalized)) aliases.push('Secretaria da Fazenda do Estado do Piauí', 'SEFAZ-PI', 'Fundação Carlos Chagas FCC');
   if (/PMPA/.test(normalized)) aliases.push('Polícia Militar do Pará', 'CFP PMPA 2023', 'CFO PMPA 2023', 'Cebraspe', 'site:pm.pa.gov.br');
+  if (/\\bCBM\\s*PA\\b|\\bCBMPA\\b|\\bBOMBEIROS\\b/.test(normalized)) aliases.push('Corpo de Bombeiros Militar do Pará', 'CBMPA', 'CFP Bombeiros Pará 2023', 'CFO Bombeiros Pará 2023', 'Cebraspe', 'Instituto AOCP', 'site:bombeiros.pa.gov.br', 'site:cebraspe.org.br/concursos/cbm_pa_23_cfp');
   if (/SEDUC/.test(normalized) && /PA|PARA/.test(normalized)) aliases.push('Secretaria de Estado de Educação do Pará', 'SEPLAD SEDUC Pará C-223', 'FGV SEDUC Pará');
   return aliases;
 }
